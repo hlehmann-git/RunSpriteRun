@@ -1,0 +1,15 @@
+Project: Amiga
+System: Amiga
+FramesPerSecond: 12
+FrameSize: 32 x 32
+SheetFile: Amiga_Left_SpriteSheet.png
+SheetSize: 284 x 44
+Number, Label, Group, X, Y, Width, Height
+11, Left_1, Left, 0, 0, 32, 32
+12, Left_2, Left, 36, 0, 32, 32
+13, Left_3, Left, 72, 0, 32, 32
+14, Left_4, Left, 108, 0, 32, 32
+15, Left_5, Left, 144, 0, 32, 32
+16, Left_6, Left, 180, 0, 32, 32
+17, Left_7, Left, 216, 0, 32, 32
+18, Left_8, Left, 252, 0, 32, 32

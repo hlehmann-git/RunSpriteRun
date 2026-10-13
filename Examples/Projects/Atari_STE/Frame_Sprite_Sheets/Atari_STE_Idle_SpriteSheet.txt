@@ -1,0 +1,11 @@
+Project: Atari_STE
+System: Atari STE
+FramesPerSecond: 12
+FrameSize: 32 x 32
+SheetFile: Atari_STE_Idle_SpriteSheet.png
+SheetSize: 140 x 44
+Number, Label, Group, X, Y, Width, Height
+1, Idle_1, Idle, 0, 0, 32, 32
+2, Idle_2, Idle, 36, 0, 32, 32
+3, Idle_3, Idle, 72, 0, 32, 32
+4, Idle_4, Idle, 108, 0, 32, 32
