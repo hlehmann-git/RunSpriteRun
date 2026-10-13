@@ -1,8 +1,10 @@
 """Project Information (FR-3.14), Help and About boxes (File and Help menus, section 5.3)."""
 from __future__ import annotations
 
+from pathlib import Path
+
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QPixmap
 from PySide6.QtWidgets import (QDialog, QGridLayout, QHBoxLayout, QLabel, QPlainTextEdit, QPushButton, QSpinBox,
                                QVBoxLayout, QWidget)
 
@@ -11,7 +13,14 @@ from src.core.rules import GAP_MAX, GAP_MIN
 
 APP_NAME = "RunSpriteRun"
 AUTHOR = "Harley Lehmann"
-VERSION = "1.0"
+VERSION = "2.0.1"
+CLAUDE_COMMENTS = 5649      # a nice touch from the owner, never updated
+BRAND_IMAGE = Path(__file__).parent / "assets" / "brand.png"
+ABOUT_DESCRIPTION = [
+    "RunSpriteRun is a windows app that takes the 2026 out of 1992 when it comes to frame grouping, animations, "
+    "editing and saving. Think Deluxe Paint for the Amiga but stripped down to what you want and need.",
+    "Work in the system you want.  It's all you."]
+ABOUT_SMALL_PRINT = ["Made by Harley Lehmann with my Buddy Claude.", "Built with Python, PySide6 and Pillow."]
 PLACEHOLDER = ["Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
                "Sed do eiusmod tempor incididunt ut labore et dolore.",
                "Ut enim ad minim veniam, quis nostrud exercitation.",
@@ -122,35 +131,57 @@ class HelpDialog(QDialog):
 
 
 class AboutDialog(QDialog):
+    """Branding image, version, comment count, description and small print (Help > About)."""
+
+    IMAGE_WIDTH = 480
+
     def __init__(self, parent: QWidget) -> None:
         super().__init__(parent)
         self.setWindowTitle("About RunSpriteRun")
         self.setWindowFlag(Qt.WindowContextHelpButtonHint, False)
-        self.setMinimumWidth(440)
-        title = QLabel(APP_NAME)
-        f = QFont(title.font())
-        f.setPointSizeF(f.pointSizeF() * 1.9)
-        f.setBold(True)
-        title.setFont(f)
-        self.author = QLabel(f"by {AUTHOR}")
-        self.version = QLabel(f"Version {VERSION}")
-        self.version.setStyleSheet("color: #8a8a94;")
-        self.text = QPlainTextEdit("\n".join(PLACEHOLDER[:5]))     # how the app was made (placeholder)
-        self.text.setReadOnly(True)
-        self.text.setFixedHeight(5 * self.text.fontMetrics().lineSpacing() + 20)
+        self.picture = QLabel()
+        self.picture.setAlignment(Qt.AlignCenter)
+        pix = QPixmap(str(BRAND_IMAGE))
+        if not pix.isNull():
+            scaled = pix.scaledToWidth(self.IMAGE_WIDTH, Qt.FastTransformation)       # crisp pixels
+            self.picture.setPixmap(scaled)
+            self.picture.setFixedSize(scaled.size())                                 # never squeezed or cropped
+        self.version = _bold(QLabel(f"Version {VERSION}"))
+        self.author = _bold(QLabel("by Harley Lehmann"))
+        dot = _bold(QLabel("\u00b7"))
+        self.comments = QLabel(f"Number of Claude comments from Harley: {CLAUDE_COMMENTS} (from the start)")
+        self.comments.setStyleSheet("color: #78c8ff;")
+        self.description_title = _bold(QLabel("Description"))
+        self.description = QLabel("\n\n".join(ABOUT_DESCRIPTION))
+        self.description.setWordWrap(True)
+        self.description.setFixedWidth(self.IMAGE_WIDTH)                            # wraps at the image width
+        self.small_print_title = _bold(QLabel("Small Print"))
+        self.small_print = QLabel("\n".join(ABOUT_SMALL_PRINT))
+        self.small_print.setStyleSheet("color: #8a8a94;")
         ok = QPushButton("OK")
         ok.setDefault(True)
         ok.clicked.connect(self.accept)
         buttons = QHBoxLayout()
         buttons.addStretch()
         buttons.addWidget(ok)
+        head = QHBoxLayout()
+        head.addWidget(self.version)
+        head.addWidget(dot)
+        head.addWidget(self.author)
+        head.addStretch()
         layout = QVBoxLayout(self)
+        layout.setSizeConstraint(QVBoxLayout.SetFixedSize)                           # the box is exactly as tall as its content
         layout.setContentsMargins(20, 20, 20, 16)
         layout.setSpacing(8)
-        layout.addWidget(title)
-        layout.addWidget(self.author)
-        layout.addWidget(self.version)
+        layout.addWidget(self.picture, 0, Qt.AlignHCenter)
+        layout.addSpacing(4)
+        layout.addLayout(head)
+        layout.addWidget(self.comments)
         layout.addSpacing(8)
-        layout.addWidget(self.text)
+        layout.addWidget(self.description_title)
+        layout.addWidget(self.description)
+        layout.addSpacing(8)
+        layout.addWidget(self.small_print_title)
+        layout.addWidget(self.small_print)
         layout.addSpacing(8)
         layout.addLayout(buttons)
