@@ -1,7 +1,7 @@
 """Starting and leaving Edit mode, with the two questions the owner is asked (V2.0)."""
 from __future__ import annotations
 
-from PySide6.QtWidgets import (QCheckBox, QDialog, QDialogButtonBox, QLabel, QRadioButton, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QButtonGroup, QDialog, QDialogButtonBox, QLabel, QRadioButton, QVBoxLayout, QWidget)
 
 from src.app import messages
 from src.core.edit import EditError
@@ -11,7 +11,8 @@ MSG_LEAVE_DETAIL = "Your edits are not applied to the frame until you leave Edit
 
 
 class EditStartDialog(QDialog):
-    """Create new frame or edit the existing one; a new frame goes before or after the selected frame, or first."""
+    """Edit the existing frame, or create a new one: empty or a copy of the selected frame, placed before or after the
+    selected frame, or as frame 1."""
 
     def __init__(self, parent: QWidget, selected_number: int) -> None:
         super().__init__(parent)
@@ -21,16 +22,27 @@ class EditStartDialog(QDialog):
         self.existing = QRadioButton(f"Edit existing frame (frame {selected_number})")
         self.new = QRadioButton("Create new frame")
         self.existing.setChecked(True)
+        top = QButtonGroup(self)                         # the two main choices: one group, so they never undo each other
+        top.addButton(self.existing)
+        top.addButton(self.new)
         lay.addWidget(self.existing)
         lay.addWidget(self.new)
-        self.before = QRadioButton(f"Insert before the selected frame ({selected_number})")
-        self.after = QRadioButton(f"Insert after the selected frame ({selected_number})")
-        self.first = QRadioButton("Insert as Frame 1")
-        self.after.setChecked(True)
-        self.copy = QCheckBox("Start from a copy of the selected frame")
-        for w in (self.before, self.after, self.first, self.copy):
+        # the six ways to create a frame: where it goes x what it starts from, all in their own radio group
+        self.copy_before = QRadioButton(f"Use existing frame and insert before current frame ({selected_number})")
+        self.copy_after = QRadioButton(f"Use existing frame and insert after current frame ({selected_number})")
+        self.copy_first = QRadioButton("Use existing frame and insert as frame 1")
+        self.empty_before = QRadioButton(f"Empty Frame and insert before current frame ({selected_number})")
+        self.empty_after = QRadioButton(f"Empty Frame and insert after current frame ({selected_number})")
+        self.empty_first = QRadioButton("Empty Frame and insert as frame 1")
+        self.options = (self.copy_before, self.copy_after, self.copy_first,
+                        self.empty_before, self.empty_after, self.empty_first)
+        sub = QButtonGroup(self)
+        for w in self.options:
+            sub.addButton(w)
             w.setStyleSheet("margin-left: 22px;")
             lay.addWidget(w)
+        self.empty_after.setChecked(True)
+        self._groups = (top, sub)
         self.new.toggled.connect(self._sync)
         self._sync()
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
@@ -39,12 +51,14 @@ class EditStartDialog(QDialog):
         lay.addWidget(buttons)
 
     def _sync(self) -> None:
-        for w in (self.before, self.after, self.first, self.copy):
+        for w in self.options:
             w.setEnabled(self.new.isChecked())
 
     def choice(self) -> dict:
-        where = "before" if self.before.isChecked() else "first" if self.first.isChecked() else "after"
-        return {"new": self.new.isChecked(), "where": where, "copy": self.copy.isChecked()}
+        where = ("before" if self.copy_before.isChecked() or self.empty_before.isChecked()
+                 else "first" if self.copy_first.isChecked() or self.empty_first.isChecked() else "after")
+        copy = self.copy_before.isChecked() or self.copy_after.isChecked() or self.copy_first.isChecked()
+        return {"new": self.new.isChecked(), "where": where, "copy": copy}
 
 
 def enter(parent: QWidget, session) -> bool:

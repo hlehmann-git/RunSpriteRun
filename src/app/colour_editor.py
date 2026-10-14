@@ -247,6 +247,7 @@ class ColourEditorPanel(Panel):
 
         controller.project_changed.connect(self._project_changed)
         controller.frames_changed.connect(self._refresh_transparent)
+        controller.edit.colour_added.connect(self._colour_added)
         controller.palette_clicked.connect(lambda slot: self._palette_clicked(slot, "primary"))
         controller.palette_right_clicked.connect(lambda slot: self._palette_clicked(slot, "secondary"))
         controller.frame_pixel_clicked.connect(lambda c: self._pixel_clicked(c, "primary"))
@@ -399,6 +400,12 @@ class ColourEditorPanel(Panel):
         elif self.controller.edit.mode:
             self._hint = None
             self._set_colour(colours[slot], which="primary")            # Edit mode: left click, the primary colour
+
+    def _colour_added(self, colour) -> None:
+        """After the + colour tool: nothing stays armed, and the new colour is the primary colour to draw with."""
+        self._disarm()
+        self._hint = None
+        self._set_colour(tuple(colour), which="primary")
 
     def _pixel_clicked(self, colour, which: str = "primary") -> None:
         if self.eyedropper_armed:

@@ -220,3 +220,18 @@ def test_play_and_f5_buttons_light_up(win):
     assert not gp.play_btn.isChecked()
     win.toggle_run()
     assert win.panels["RunSpriteRun window"].f5_btn.isChecked()
+
+
+def test_plus_colour_returns_to_pencil_with_the_new_colour(win, log):
+    c = win.controller
+    assert c.edit.begin()
+    e = ed(win)
+    c.edit.set_tool("bucket")
+    e._set_colour((lv(1, 3), lv(2, 3), lv(3, 3)), arm=True)          # picking a colour arms 'overwrite a square'
+    assert e.armed
+    new = e.colour
+    assert c.edit.add_colour()
+    assert new in c.project.palette()
+    assert c.edit.tool == "pencil" and c.edit.active == new and not e.armed
+    click_slot(win, 0)                                                # no 'Merge these colours?' question any more
+    assert log["choose"] == []

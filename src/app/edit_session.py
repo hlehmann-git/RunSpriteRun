@@ -31,6 +31,7 @@ class EditSession(QObject):
     changed = Signal()               # mode, tool, options, layer boxes or the drawing colour changed
     frame_edited = Signal(int)       # the picture of a frame changed (also while a stroke is still being drawn)
     notice = Signal(str)             # a short message for the information bar
+    colour_added = Signal(tuple)     # the + colour tool added this colour to the palette
 
     def __init__(self, controller) -> None:
         super().__init__()
@@ -281,6 +282,9 @@ class EditSession(QObject):
             return False                                  # already in the palette
         self.controller.commit(before)                    # (nothing is recorded while Edit mode is on)
         self.controller.frames_changed.emit()
+        self.tool = "pencil"                              # the new colour is ready to draw with
+        self.active = tuple(self.editor_colour)
+        self.colour_added.emit(self.active)               # the Colour editor lets go of "overwrite a square" and selects it
         self.changed.emit()
         return True
 
