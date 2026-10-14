@@ -31,7 +31,7 @@ def shown(monkeypatch):
 def test_defaults_and_system_details(app, tmp_path):
     d = StartProjectDialog(folder=str(tmp_path))
     assert d.system.currentText() == "Atari ST"
-    assert d.fps.currentText() == "12" and d.from_files.isChecked()
+    assert d.fps.currentText() == "12" and d.blank_radio.isChecked() and not d.from_files.isChecked()
     assert d._detail_values["Total palette colours"].text() == "512"
     d.system.setCurrentText("Amiga")
     assert d._detail_values["Max sprite colours"].text() == "32"
@@ -55,7 +55,7 @@ def test_size_read_from_files_and_natural_order(app, tmp_path):
     assert (d.width_box.value(), d.height_box.value()) == (16, 12)
     assert d.summary.text() == "3 files selected, all 16 x 12"
     assert not d.width_box.isEnabled()
-    d.from_files.setChecked(False)
+    d.size_radio.setChecked(True)
     assert d.width_box.isEnabled()
 
 
@@ -92,10 +92,10 @@ def test_mixed_sizes_block(app, tmp_path, shown):
 
 def test_size_outside_range_blocks(app, tmp_path, shown):
     d = StartProjectDialog(folder=str(tmp_path))
-    d.set_files([make_png(tmp_path / "a.png", size=(65, 8))])
+    d.set_files([make_png(tmp_path / "a.png", size=(129, 8))])
     d.name.setText("Demo")
     d._create()
-    assert d.project is None and "4 to 64" in shown["warn"][0][0]
+    assert d.project is None and "4 to 128" in shown["warn"][0][0]
 
 
 def test_skipped_files_continue_or_back(app, tmp_path, shown):
@@ -148,3 +148,74 @@ def test_open_project_and_damaged(app, tmp_path, shown):
     assert d2.project is None and "could not be opened" in shown["warn"][-1][0]
     d2.open_path(out)
     assert d2.project and d2.project.name == "Demo"
+
+
+def test_blank_project_options_and_creation(app, tmp_path, monkeypatch):
+    monkeypatch.setenv("RUNSPRITERUN_HOME", str(tmp_path))
+    d = StartProjectDialog(folder=str(tmp_path))
+    d.show()
+    # blank is the starting choice: sizes editable, FPS editable, both import options off
+    assert d.blank_radio.isChecked() and d.size_radio.isChecked() and not d.from_files.isEnabled()
+    assert d.width_box.isEnabled() and d.height_box.isEnabled() and d.fps.isEnabled() and d.blank_frames.isEnabled()
+    assert not d.browse.isEnabled() and not d.sheet_browse.isEnabled()
+    assert not d.create_btn.isEnabled()                       # needs a name
+    d.name.setText("Fresh")
+    assert d.create_btn.isEnabled()
+    d.width_box.setValue(32); d.height_box.setValue(48); d.blank_frames.setValue(5)
+    d.fps.setCurrentText("24")
+    d._create()
+    p = d.project
+    assert (p.name, p.width, p.height, p.fps, len(p.frames)) == ("Fresh", 32, 48, 24, 5)
+    assert p.frames[0].image.size == (32, 48) and p.frames[4].label == "Frame_5"
+    assert p.frames[0].image.getpixel((0, 0)) == p.transparent
+
+
+def test_blank_name_must_be_new_and_modes_switch_freely(app, tmp_path, monkeypatch):
+    monkeypatch.setenv("RUNSPRITERUN_HOME", str(tmp_path))
+    (tmp_path / "Projects" / "Taken").mkdir(parents=True)
+    d = StartProjectDialog(folder=str(tmp_path))
+    d.show()
+    d.name.setText("Taken")
+    assert not d.create_btn.isEnabled() and "already exists" in d.summary.text()
+    d.name.setText("Free")
+    assert d.create_btn.isEnabled()
+    for radio in (d.sheet_radio, d.files_radio, d.blank_radio, d.files_radio, d.sheet_radio, d.blank_radio):
+        radio.setChecked(True)                                # change your mind as often as you like
+        assert radio.isChecked()
+    d.files_radio.setChecked(True)
+    assert d.from_files.isChecked() and d.from_files.isEnabled() and d.browse.isEnabled()
+    d.blank_radio.setChecked(True)
+    assert d.size_radio.isChecked() and not d.from_files.isEnabled() and d.blank_frames.isEnabled()
+
+
+def test_blank_starts_at_32_and_boxes_follow_import_size(app, tmp_path):
+    d = StartProjectDialog(folder=str(tmp_path))
+    assert (d.width_box.value(), d.height_box.value()) == (32, 32) and d.width_box.isEnabled()
+    d.set_files([make_png(tmp_path / "a.png", size=(16, 12))])
+    assert d.from_files.isChecked() and not d.width_box.isEnabled()
+    assert (d.width_box.value(), d.height_box.value()) == (16, 12) and "16 x 12" in d.found_label.text()
+
+
+def test_larger_canvas_centres_the_sprites(app, tmp_path, shown):
+    d = StartProjectDialog(folder=str(tmp_path))
+    d.set_files([make_png(tmp_path / "a.png", size=(8, 8), colours=((255, 0, 0), (0, 0, 255)))])
+    d.name.setText("Big")
+    d.size_radio.setChecked(True)
+    d.width_box.setValue(13); d.height_box.setValue(10)
+    assert d.create_btn.isEnabled()
+    d._create()
+    p = d.project
+    assert (p.width, p.height) == (13, 10) and p.frames[0].image.size == (13, 10) and not shown["warn"]
+    fill = p.transparent
+    im = p.frames[0].image
+    assert im.getpixel((0, 0)) == fill and im.getpixel((12, 9)) == fill
+    assert im.getpixel((2, 1)) != fill or im.getpixel((3, 1)) != fill       # sprite starts at x 2 (5 spare: 2 left, 3 right), y 1
+
+
+def test_canvas_smaller_than_sprites_is_refused(app, tmp_path):
+    d = StartProjectDialog(folder=str(tmp_path))
+    d.set_files([make_png(tmp_path / "a.png", size=(16, 16))])
+    d.name.setText("Small")
+    d.size_radio.setChecked(True)
+    d.width_box.setValue(12); d.height_box.setValue(20)
+    assert not d.create_btn.isEnabled() and "at least 16 x 16" in d.summary.text()

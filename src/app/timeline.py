@@ -3,6 +3,7 @@ Frame number / Frame Label / Frame Group rows, selection, label editing, and reo
 dragging or Ctrl+Left / Ctrl+Right."""
 from __future__ import annotations
 
+from PIL import Image
 from PySide6.QtCore import QEvent, QPoint, QRect, Qt, Signal
 from PySide6.QtWidgets import QApplication
 from PySide6.QtGui import QColor, QKeySequence, QPainter, QPen, QShortcut
@@ -63,7 +64,11 @@ class Thumb(QWidget):
         if self.image is not None:
             dpr = self.devicePixelRatioF()
             inner_w, inner_h = round((BOX_W - 4) * dpr), round((BOX_H - 4) * dpr)
-            sprite = scaled_sprite(self.image, self.transparent, inner_w, inner_h, grid=False)
+            img = self.image
+            shrink = max(-(-img.width // inner_w), -(-img.height // inner_h))     # frames bigger than the box: whole-number shrink
+            if shrink > 1:
+                img = img.resize((max(1, img.width // shrink), max(1, img.height // shrink)), Image.NEAREST)
+            sprite = scaled_sprite(img, self.transparent, inner_w, inner_h, grid=False)
             qimg = to_qimage(sprite, dpr)
             x = (BOX_W - sprite.width / dpr) / 2
             y = (BOX_H - sprite.height / dpr) / 2

@@ -18,6 +18,8 @@ from src.core.importer import ACCEPTED_SUFFIXES, import_files, msg_frame_limit, 
 from src.core import sheet_import
 from src.core.project import Project
 from src.core.rules import DEFAULT_FPS, FPS_CHOICES, MAX_FRAMES, MAX_SIZE, MIN_SIZE, valid_project_name
+from src.core.colour import snap_colour
+from src.core.importer import ImportedFrame, ImportResult
 from src.core.systems import SYSTEMS, get_system
 from src.io import paths
 from src.io.project_file import ProjectFileError, open_project
@@ -26,6 +28,9 @@ DEFAULT_SYSTEM = "Atari ST"
 NAME_HINT = "Letters, numbers, - and _ only (no spaces), 1 to 40 characters"
 NAME_ERROR = "Project names can only use letters, numbers, - and _ (no spaces)."
 GREY = "color: #8a8a94;"
+BLANK_FRAMES_DEFAULT = 12
+BLANK_SIZE_DEFAULT = 32
+INDENT = 24
 SHEET_INFO = ("Importing a sprite sheet will save that sheet into the project folder, and also extract all sprites "
               "within the bounding boxes as sprites for your project, these will be saved in the sprites folder - "
               "this can only be done ONCE per new project. Lorem ipsum")
@@ -79,7 +84,7 @@ class StartProjectDialog(QDialog):
         self._grid = sheet_import.SheetGrid()
         self._build()
         self._refresh()
-        self.setFixedSize(560, 760)                  # not resizable
+        self.setFixedSize(560, self.sizeHint().height())                  # not resizable
 
     # ---- layout -------------------------------------------------------------------------
     def _build(self) -> None:
@@ -98,45 +103,13 @@ class StartProjectDialog(QDialog):
         self.name_hint.setStyleSheet(GREY)
         grid.addWidget(self.name_hint, 1, 1)
 
-        heading = QLabel("<b>Frame/Sprite Dimensions</b>")
-        grid.addWidget(heading, 2, 0, 1, 2)
-        row = QHBoxLayout()
-        self.from_files = QCheckBox("Set from imported files")
-        self.from_files.setChecked(True)
-        self.from_files.toggled.connect(self._refresh)
-        row.addWidget(self.from_files)
-        row.addSpacing(8)
-        note = QLabel("Size is read from the files. All files must be the same size.")
-        note.setStyleSheet(GREY)
-        row.addWidget(note, 1)
-        grid.addLayout(row, 3, 0, 1, 2)
-
-        dims = QHBoxLayout()
-        dims.addWidget(QLabel("Frame width (4-64)"))
-        self.width_box = QSpinBox()
-        self.height_box = QSpinBox()
-        for box in (self.width_box, self.height_box):
-            box.setRange(MIN_SIZE, MAX_SIZE)
-            box.setValue(MAX_SIZE)
-            box.setButtonSymbols(QSpinBox.NoButtons)
-            box.setAlignment(Qt.AlignCenter)
-            box.setFixedWidth(64)
-        dims.addSpacing(8)
-        dims.addWidget(self.width_box)
-        dims.addSpacing(16)
-        dims.addWidget(QLabel("Frame height (4-64)"))
-        dims.addSpacing(8)
-        dims.addWidget(self.height_box)
-        dims.addStretch(1)
-        grid.addLayout(dims, 4, 0, 1, 2)
-
-        grid.addWidget(QLabel("Target system"), 5, 0)
+        grid.addWidget(QLabel("Target system"), 2, 0)
         self.system = QComboBox()
         for s in SYSTEMS:
             self.system.addItem(s.name)
         self.system.setCurrentText(DEFAULT_SYSTEM)
         self.system.currentTextChanged.connect(self._refresh)
-        grid.addWidget(self.system, 5, 1)
+        grid.addWidget(self.system, 2, 1)
 
         details = QGroupBox("System details")
         details.setStyleSheet("QGroupBox, QLabel { color: #8a8a94; }")
@@ -149,7 +122,42 @@ class StartProjectDialog(QDialog):
             d.addWidget(QLabel(key), i // 2, (i % 2) * 2)
             d.addWidget(value, i // 2, (i % 2) * 2 + 1)
             self._detail_values[key] = value
-        grid.addWidget(details, 6, 0, 1, 2)
+        grid.addWidget(details, 3, 0, 1, 2)
+
+        grid.addWidget(QLabel("<b>Project Details</b>"), 4, 0, 1, 2)
+        # frame size: either typed in, or taken from the imported sprites
+        self.size_radio = QRadioButton("Set frame size")
+        self.from_files = QRadioButton("Set from imported sprites")      # (the old tick box, now a radio)
+        self.size_group = QButtonGroup(self)
+        self.size_group.addButton(self.size_radio)
+        self.size_group.addButton(self.from_files)
+        self.size_radio.setChecked(True)
+        self.width_box = QSpinBox()
+        self.height_box = QSpinBox()
+        for box in (self.width_box, self.height_box):
+            box.setRange(MIN_SIZE, MAX_SIZE)
+            box.setValue(BLANK_SIZE_DEFAULT)
+            box.setButtonSymbols(QSpinBox.NoButtons)
+            box.setAlignment(Qt.AlignCenter)
+            box.setFixedWidth(64)
+        size_row = QHBoxLayout()
+        size_row.setSpacing(8)
+        size_row.addWidget(self.size_radio)
+        size_row.addWidget(QLabel("Width"))
+        size_row.addWidget(self.width_box)
+        size_row.addWidget(QLabel("Height"))
+        size_row.addWidget(self.height_box)
+        size_row.addWidget(QLabel(f"({MIN_SIZE}-{MAX_SIZE})"))
+        size_row.addStretch(1)
+        grid.addLayout(size_row, 5, 0, 1, 2)
+        auto_row = QHBoxLayout()
+        auto_row.setSpacing(8)
+        auto_row.addWidget(self.from_files)
+        self.found_label = QLabel()
+        self.found_label.setStyleSheet(GREY)
+        auto_row.addWidget(self.found_label, 1)
+        grid.addLayout(auto_row, 6, 0, 1, 2)
+        self.size_group.buttonToggled.connect(lambda *_: self._refresh())
 
         grid.addWidget(QLabel("Frames per second"), 7, 0)
         fps_row = QHBoxLayout()
@@ -161,20 +169,40 @@ class StartProjectDialog(QDialog):
         fps_row.addStretch(1)
         grid.addLayout(fps_row, 7, 1)
 
+        grid.addWidget(QLabel("<b>Starting sprites</b>"), 8, 0, 1, 2)
+        self.blank_radio = QRadioButton("Blank project")
+        self.blank_radio.setChecked(True)
+        grid.addWidget(self.blank_radio, 9, 0, 1, 2)
+        blank_row = QHBoxLayout()
+        blank_row.setContentsMargins(INDENT, 0, 0, 0)
+        blank_row.setSpacing(8)
+        blank_row.addWidget(QLabel("Empty frames"))
+        self.blank_frames = QSpinBox()
+        self.blank_frames.setRange(1, MAX_FRAMES)
+        self.blank_frames.setValue(BLANK_FRAMES_DEFAULT)
+        self.blank_frames.setAlignment(Qt.AlignCenter)
+        self.blank_frames.setFixedWidth(64)
+        blank_row.addWidget(self.blank_frames)
+        blank_note = QLabel(f"1 to {MAX_FRAMES}")
+        blank_note.setStyleSheet(GREY)
+        blank_row.addWidget(blank_note)
+        blank_row.addStretch(1)
+        grid.addLayout(blank_row, 10, 0, 1, 2)
+
         self.sheet_radio = QRadioButton("Import sprite sheet")
-        sheet_label = self.sheet_radio
         self.sheet_browse = QPushButton("Browse...")
         self.sheet_browse.clicked.connect(self._browse_sheet)
         self.sheet_info = InfoButton(SHEET_INFO, self)
         sheet_row = QHBoxLayout()
         sheet_row.setContentsMargins(0, 0, 0, 0)
         sheet_row.setSpacing(8)
-        sheet_row.addWidget(sheet_label)
+        sheet_row.addWidget(self.sheet_radio)
         sheet_row.addWidget(self.sheet_browse)
         sheet_row.addWidget(self.sheet_info)
         sheet_row.addStretch(1)
-        grid.addLayout(sheet_row, 8, 0, 1, 2)
+        grid.addLayout(sheet_row, 11, 0, 1, 2)
         colours_row = QHBoxLayout()
+        colours_row.setContentsMargins(INDENT, 0, 0, 0)
         colours_row.setSpacing(8)
         colours_row.addWidget(QLabel("Box colour"))
         self.box_colour = ColourField(self, (0, 255, 0))
@@ -184,43 +212,46 @@ class StartProjectDialog(QDialog):
         self.fill_colour = ColourField(self, (255, 255, 255))
         colours_row.addWidget(self.fill_colour)
         colours_row.addStretch(1)
-        grid.addLayout(colours_row, 9, 0, 1, 2)
+        grid.addLayout(colours_row, 12, 0, 1, 2)
         for f in (self.box_colour, self.fill_colour):
             f.hex.editingFinished.connect(self._sheet_colours)
             f.swatch.clicked.connect(self._sheet_colours)
         self.sheet_hint = QLabel("PNG, BMP or GIF. Boxes are found by their colour; empty boxes are left out.")
         self.sheet_hint.setStyleSheet(GREY)
-        grid.addWidget(self.sheet_hint, 10, 0, 1, 2)
+        self.sheet_hint.setContentsMargins(INDENT, 0, 0, 0)
+        grid.addWidget(self.sheet_hint, 13, 0, 1, 2)
 
         self.files_radio = QRadioButton("Import image files")
-        self.files_radio.setChecked(True)
-        files_label = self.files_radio
         self.mode = QButtonGroup(self)
+        self.mode.addButton(self.blank_radio)
         self.mode.addButton(self.sheet_radio)
         self.mode.addButton(self.files_radio)
         self.sheet_radio.toggled.connect(self._mode_changed)
+        self.blank_radio.toggled.connect(self._mode_changed)
         self.browse = QPushButton("Browse...")
         self.browse.clicked.connect(self._browse)
-        gap = 8                                      # space between the label and the Browse button
+        files_hint = QLabel("PNG, BMP or GIF, up to 120 files.")
+        files_hint.setStyleSheet(GREY)
         browse_row = QHBoxLayout()
         browse_row.setContentsMargins(0, 0, 0, 0)
-        browse_row.setSpacing(gap)
-        browse_row.addWidget(files_label)
+        browse_row.setSpacing(8)
+        browse_row.addWidget(self.files_radio)
         browse_row.addWidget(self.browse)
+        browse_row.addWidget(files_hint)
         browse_row.addStretch(1)
-        grid.addLayout(browse_row, 11, 0, 1, 2)
-        hint = QLabel("PNG, BMP or GIF, up to 120 files. Ctrl+click or Shift+click to pick files.")
-        hint.setStyleSheet(GREY)
-        hint.setContentsMargins(files_label.sizeHint().width() + gap, 0, 0, 0)   # lines up under Browse
-        grid.addWidget(hint, 12, 0, 1, 2)
+        grid.addLayout(browse_row, 14, 0, 1, 2)
+        for box in (self.blank_frames, self.width_box, self.height_box):
+            box.valueChanged.connect(self._refresh)
 
-        root.addSpacing(4)
-        self.file_list = QListWidget()
+        self.file_list = QListWidget()                 # filled by the code below but not shown (no list of names)
         self.file_list.setSelectionMode(QAbstractItemView.NoSelection)
-        self.file_list.setMinimumHeight(150)
-        root.addWidget(self.file_list)
+        self.file_list.hide()
+        root.addSpacing(4)
         self.summary = QLabel()
+        self.summary.setStyleSheet(GREY)
+        self.summary.setWordWrap(True)
         root.addWidget(self.summary)
+        root.addStretch(1)
 
         buttons = QHBoxLayout()
         buttons.addStretch(1)
@@ -244,6 +275,7 @@ class StartProjectDialog(QDialog):
 
     def set_files(self, paths: list[Path]) -> None:
         """Replace the selection (Browse again replaces it). Shown in natural file-name order."""
+        self.files_radio.setChecked(True)
         self._clear_sheet()
         self._files = sorted((Path(p) for p in paths if Path(p).suffix.lower() in ACCEPTED_SUFFIXES),
                              key=natural_key)
@@ -275,21 +307,42 @@ class StartProjectDialog(QDialog):
             self.name_hint.setStyleSheet(GREY)
 
         sheet = self.sheet_mode()
+        blank = self.blank_mode()
         for w_ in (self.sheet_browse, self.box_colour, self.fill_colour, self.sheet_hint):
             w_.setEnabled(sheet)
-        self.browse.setEnabled(not sheet)
-        self.from_files.setEnabled(not sheet)
-        auto = self.from_files.isChecked() or sheet
+        self.browse.setEnabled(not sheet and not blank)
+        self.blank_frames.setEnabled(blank)
+        if blank and not self.size_radio.isChecked():            # Blank: the size is always typed in
+            self._set_size_radio(True)
+        self.from_files.setEnabled(not blank)
+        auto = self.from_files.isChecked() and not blank
         self.width_box.setEnabled(not auto)
         self.height_box.setEnabled(not auto)
-        found = self._found_size()
-        if self._sheet_image is not None and not self._grid.error:
-            found = (self._grid.width, self._grid.height)
+        found = self._native_size()
+        self.found_label.setText(f"{found[0]} x {found[1]}" if found and not blank else "")
         if auto and found and MIN_SIZE <= found[0] <= MAX_SIZE and MIN_SIZE <= found[1] <= MAX_SIZE:
-            self.width_box.setValue(found[0])
-            self.height_box.setValue(found[1])
+            for box, v in ((self.width_box, found[0]), (self.height_box, found[1])):
+                box.blockSignals(True)
+                box.setValue(v)
+                box.blockSignals(False)
+        small = (not auto and not blank and found is not None
+                 and (self.width_box.value() < found[0] or self.height_box.value() < found[1]))
+        self.summary.setStyleSheet("color: #e5736b;" if small else GREY)
 
         n = len(self._files)
+        if blank:
+            taken = self._blank_folder_taken()
+            self.summary.setStyleSheet("color: #e5736b;" if taken else GREY)
+            self.summary.setText(f"A project called {text} already exists in the Projects folder. Choose another name."
+                                 if taken else f"{self.blank_frames.value()} empty frames, "
+                                 f"{self.width_box.value()} x {self.height_box.value()}")
+            self.create_btn.setEnabled(name_ok and not taken)
+            return
+        if small:
+            self.summary.setText(f"The sprites are {found[0]} x {found[1]}, so the frame size must be at least "
+                                 f"{found[0]} x {found[1]}.")
+            self.create_btn.setEnabled(False)
+            return
         if sheet:
             if self._sheet_image is None:
                 self.summary.setText("No sprite sheet selected")
@@ -310,6 +363,18 @@ class StartProjectDialog(QDialog):
             self.summary.setText(f"{n} file{'s' if n != 1 else ''} selected, sizes differ")
         self.create_btn.setEnabled(name_ok and n > 0)
 
+    def _set_size_radio(self, typed: bool) -> None:
+        """Choose 'Set frame size' (typed) or 'Set from imported sprites' without triggering a refresh."""
+        self.size_group.blockSignals(True)
+        (self.size_radio if typed else self.from_files).setChecked(True)
+        self.size_group.blockSignals(False)
+
+    def _native_size(self) -> tuple[int, int] | None:
+        """The size of the imported sprites: the sprite sheet's boxes, or the one size shared by every file."""
+        if self.sheet_mode():
+            return (self._grid.width, self._grid.height) if self._sheet_image is not None and not self._grid.error else None
+        return self._found_size()
+
     # ---- actions ------------------------------------------------------------------------
     def _browse(self) -> None:
         names, _ = QFileDialog.getOpenFileNames(
@@ -321,15 +386,30 @@ class StartProjectDialog(QDialog):
     def sheet_mode(self) -> bool:
         return self.sheet_radio.isChecked()
 
+    def blank_mode(self) -> bool:
+        return self.blank_radio.isChecked()
+
+    def _blank_folder_taken(self) -> bool:
+        """A blank project needs a new name: no project folder with that name may exist yet."""
+        name = self.name.text()
+        return valid_project_name(name) and paths.project_folder(paths.projects_folder(), name).exists()
+
     def _mode_changed(self) -> None:
         """Only one of the two ways to bring sprites in is active; the other one is cleared and greyed out."""
         if self.sheet_mode():
             self._files, self._sizes = [], []
             self.file_list.clear()
+            self._set_size_radio(False)
+        elif self.blank_mode():
+            self._files, self._sizes = [], []
+            self._clear_sheet()
+            self.file_list.clear()
+            self._set_size_radio(True)
         else:
             self._clear_sheet()
             self._sizes = []
             self.file_list.clear()
+            self._set_size_radio(False)
         self._refresh()
 
     def _clear_sheet(self) -> None:
@@ -356,6 +436,7 @@ class StartProjectDialog(QDialog):
         except (OSError, ValueError, SyntaxError):
             messages.warn(self, f"{Path(path).name} could not be read.")
             return
+        self.sheet_radio.setChecked(True)
         self._files, self._sizes = [], []
         self._sheet_path = Path(path)
         self._scan_sheet()
@@ -390,6 +471,24 @@ class StartProjectDialog(QDialog):
             return None
         return w, h
 
+    def _larger_canvas(self, native: tuple[int, int] | None) -> tuple[int, int] | None:
+        """The typed canvas size when it is larger than the imported sprites (they are then centred on it), else None.
+        A canvas smaller than the sprites never gets here: Create Project stays disabled."""
+        if self.from_files.isChecked() or native is None:
+            return None
+        canvas = (self.width_box.value(), self.height_box.value())
+        return canvas if canvas != native and canvas[0] >= native[0] and canvas[1] >= native[1] else None
+
+    @staticmethod
+    def _centre_on_canvas(result: ImportResult, canvas: tuple[int, int]) -> None:
+        """Put every frame in the middle of a bigger canvas, filled with the transparent colour. An odd leftover
+        pixel goes to the right and the bottom."""
+        fill = result.transparent_default
+        for f in result.frames:
+            big = Image.new("RGB", canvas, fill)
+            big.paste(f.image, ((canvas[0] - f.image.width) // 2, (canvas[1] - f.image.height) // 2))
+            f.image = big
+
     def _create_from_sheet(self) -> None:
         g = self._grid
         if self.box_colour.colour == self.fill_colour.colour:
@@ -415,12 +514,33 @@ class StartProjectDialog(QDialog):
             details = "\n".join(f"{a.file}: " + ", ".join(f"{o} -> {n}" for o, n in a.details)
                                 for a in result.adjustments)
             messages.adjusted(self, lines, details)
-        self.project = create_project(self.name.text(), system, g.width, g.height, result, self.fps.currentData())
+        size = (g.width, g.height)
+        canvas = self._larger_canvas(size)
+        if canvas:
+            self._centre_on_canvas(result, canvas)
+            size = canvas
+        self.project = create_project(self.name.text(), system, size[0], size[1], result, self.fps.currentData())
         self.project.transparent = self.fill_colour.colour
         self.project.source_sheet = str(self._sheet_path)
         self.accept()
 
+    def _create_blank(self) -> None:
+        if self._blank_folder_taken():
+            messages.warn(self, f"A project called {self.name.text()} already exists. Choose another name.")
+            return
+        system = self.selected_system()
+        w, h = self.width_box.value(), self.height_box.value()
+        transparent = snap_colour((255, 0, 255), system.bits)
+        result = ImportResult(frames=[ImportedFrame(f"Frame_{n}", Image.new("RGB", (w, h), transparent))
+                                      for n in range(1, self.blank_frames.value() + 1)])
+        self.project = create_project(self.name.text(), system, w, h, result, self.fps.currentData())
+        self.project.transparent = transparent
+        self.accept()
+
     def _create(self) -> None:
+        if self.blank_mode():
+            self._create_blank()
+            return
         if self.sheet_mode():
             self._create_from_sheet()
             return
@@ -429,6 +549,9 @@ class StartProjectDialog(QDialog):
             return
         w, h = size
         system = self.selected_system()
+        canvas = self._larger_canvas(self._found_size())
+        if canvas:
+            w, h = self._found_size()                         # the files are read at their own size, then centred
         result = import_files(self._files, system, w, h)
 
         if result.rejected:
@@ -457,6 +580,9 @@ class StartProjectDialog(QDialog):
                                 for a in result.adjustments)
             messages.adjusted(self, lines, details)
 
+        if canvas:
+            self._centre_on_canvas(result, canvas)
+            w, h = canvas
         self.project = create_project(self.name.text(), system, w, h, result, self.fps.currentData())
         self.accept()
 

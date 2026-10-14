@@ -123,12 +123,12 @@ def test_hex_box_rejects_bad_text(app):
     assert f.colour == (255, 136, 0) and f.hex.text() == "#FF8800"
 
 
-def test_width_and_height_never_exceed_64(app):
-    assert bs.problem(65, 32, 2, 2, GREEN, WHITE) == bs.MSG_TOO_MANY
-    assert bs.problem(32, 65, 2, 2, GREEN, WHITE) == bs.MSG_TOO_MANY
-    assert bs.problem(64, 64, 2, 2, GREEN, WHITE) is None
+def test_width_and_height_never_exceed_128(app):
+    assert bs.problem(129, 32, 2, 2, GREEN, WHITE) == bs.MSG_TOO_MANY
+    assert bs.problem(32, 129, 2, 2, GREEN, WHITE) == bs.MSG_TOO_MANY
+    assert bs.problem(128, 128, 2, 2, GREEN, WHITE) is None
     d = bsd.BlankSheetDialog(None)
     for box in (d.width_box, d.height_box):
-        assert box.maximum() == 64 and box.minimum() == 4
+        assert box.maximum() == 128 and box.minimum() == 4
         box.setValue(200)
-        assert box.value() == 64                           # typing or stepping past 64 stops at 64
+        assert box.value() == 128                          # typing or stepping past 128 stops at 128

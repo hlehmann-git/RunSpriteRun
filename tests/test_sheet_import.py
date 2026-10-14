@@ -85,6 +85,7 @@ def test_radio_options_exclusive(tmp_path):
     p, _ = sheet(tmp_path)
     d = StartProjectDialog(folder=str(tmp_path))
     d.show()
+    d.files_radio.setChecked(True)
     assert d.files_radio.isChecked() and d.browse.isEnabled() and not d.sheet_browse.isEnabled()
     d.sheet_radio.setChecked(True)
     assert d.sheet_browse.isEnabled() and not d.browse.isEnabled() and not d.width_box.isEnabled()
