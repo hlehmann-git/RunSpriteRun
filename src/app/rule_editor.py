@@ -4,6 +4,7 @@ from __future__ import annotations
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QButtonGroup, QCheckBox, QComboBox, QRadioButton, QWidget
 
+from src.app.theme import short_popup
 from src.app.common import frame_choice_text
 from src.core.project import Project, Rule
 
@@ -24,6 +25,8 @@ class RuleEditor(QWidget):
         self.frame_combo = QComboBox(self)
         self.frame_combo.setGeometry(101, 0, 124, 26)
         self.group_combo = QComboBox(self)
+        short_popup(self.frame_combo)
+        short_popup(self.group_combo)
         self.group_combo.setGeometry(98, 38, 80, 26)
         self.loop = QCheckBox("Loop", self)
         self.loop.move(184, 41)

@@ -43,7 +43,8 @@ def overlap(parent: QWidget, text: str) -> bool:
 def adjusted(parent: QWidget, lines: list[str], details: str) -> None:
     """FR-1.2 check 4 warning with a Details button listing original and adjusted values."""
     box = QMessageBox(QMessageBox.Warning, "RunSpriteRun", "\n".join(lines), QMessageBox.Ok, parent)
-    box.setDetailedText(details)
+    if details:
+        box.setDetailedText(details)
     box.exec()
 
 

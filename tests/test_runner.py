@@ -146,3 +146,48 @@ def test_single_frame_group_loops_without_error():
     r.start()
     r.press("W")
     assert shown(r, 3) == [3, 3, 3, 3]
+
+
+def diag_project():
+    return make([Group("Up", 0, 1, key="W", on_release=Rule("frame", "f11")),
+                 Group("Right", 2, 3, key="D"),
+                 Group("UpRight", 4, 5, key="W+D", on_release=Rule("frame", "f12"))])
+
+
+def test_diagonal_wins_whichever_key_goes_down_first():
+    for first, second in (("W", "D"), ("D", "W")):
+        r = Runner(diag_project())
+        r.start()
+        r.press(first)
+        r.press(second)
+        assert r.playing_group == "UpRight" and r.frame == 4
+        assert r.lit() == [first, second, "W+D"]
+
+
+def test_releasing_one_key_of_a_diagonal_falls_back_to_the_single_key_group():
+    r = Runner(diag_project())
+    r.start()
+    r.press("W")
+    r.press("D")
+    r.release("W")
+    assert r.playing_group == "Right"
+    r.release("D")
+    assert r.playing_group is None and r.frame == 3             # Right has no release rule: stops on its last frame
+
+
+def test_part_of_a_diagonal_counts_even_without_its_own_group():
+    p = make([Group("UpRight", 4, 5, key="W+D")])
+    r = Runner(p)
+    r.start()
+    assert r.press("A") is False                                # A has nothing to do
+    assert r.press("W") is True and r.playing_group is None     # W alone: no group, nothing plays
+    r.press("D")
+    assert r.playing_group == "UpRight"
+
+
+def test_diagonal_without_a_group_is_ignored():
+    r = Runner(diag_project())
+    r.start()
+    r.press("S")
+    r.press("D")
+    assert r.playing_group == "Right"                            # S+D has no group: D plays on its own

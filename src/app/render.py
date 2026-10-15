@@ -23,11 +23,13 @@ def hide_transparent(img: Image.Image, transparent: Colour) -> Image.Image:
     return Image.composite(Image.new("RGB", img.size, (0, 0, 0)), img, mask)
 
 
-def scaled_sprite(img: Image.Image, transparent: Colour, view_w: int, view_h: int, grid: bool) -> Image.Image:
-    """The sprite at the largest whole-number scale that fits, with the grid if asked (scale 2 or more)."""
+def scaled_sprite(img: Image.Image, transparent: Colour, view_w: int, view_h: int, grid: bool,
+                  hide: bool = False) -> Image.Image:
+    """The sprite at the largest whole-number scale that fits, with the grid if asked (scale 2 or more). The
+    transparent colour is shown as itself (it marks the frame size); hide=True paints it black (timeline boxes)."""
     w, h = img.size
     s = fit_scale(w, h, view_w, view_h)
-    big = hide_transparent(img, transparent).resize((w * s, h * s), Image.NEAREST)
+    big = (hide_transparent(img, transparent) if hide else img).resize((w * s, h * s), Image.NEAREST)
     if grid and s >= 2:
         d = ImageDraw.Draw(big)
         for k in range(1, w + 1):
@@ -42,7 +44,7 @@ def render_sprite_at(img: Image.Image, transparent: Colour, view_w: int, view_h:
     The scale never goes beyond what fits the view."""
     w, h = img.size
     s = max(1, min(scale, fit_scale(w, h, view_w, view_h)))
-    big = hide_transparent(img, transparent).resize((w * s, h * s), Image.NEAREST)
+    big = img.resize((w * s, h * s), Image.NEAREST)
     out = Image.new("RGB", (view_w, view_h), (0, 0, 0))
     out.paste(big, ((view_w - big.width) // 2, (view_h - big.height) // 2))
     return out
@@ -59,7 +61,7 @@ def render_window(img: Image.Image, transparent: Colour, view_w: int, view_h: in
     x1, y1 = min(w, (view_w - left) // scale + 1), min(h, (view_h - top) // scale + 1)
     if x1 <= x0 or y1 <= y0:
         return out
-    part = hide_transparent(img.crop((x0, y0, x1, y1)), transparent).resize(((x1 - x0) * scale, (y1 - y0) * scale), Image.NEAREST)
+    part = img.crop((x0, y0, x1, y1)).resize(((x1 - x0) * scale, (y1 - y0) * scale), Image.NEAREST)
     if grid and scale >= 2:
         d = ImageDraw.Draw(part)
         for k in range(1, x1 - x0 + 1):

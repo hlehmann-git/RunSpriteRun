@@ -1,4 +1,4 @@
-"""The Export window (FR-4.7): one window, no choices to make except the folder, the gap and the fill colour.
+"""The Export window (FR-4.7): one window, no choices to make except the folder and the fill colour.
 Everything is exported: the all-frames sheet, a sheet for every Frame Group and every frame as a PNG, into a new
 folder named after the project inside the chosen folder."""
 from __future__ import annotations
@@ -7,12 +7,11 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QComboBox, QDialog, QFileDialog, QGridLayout, QGroupBox, QHBoxLayout, QLabel,
-                               QLineEdit, QMessageBox, QPushButton, QSpinBox, QVBoxLayout, QWidget)
+                               QLineEdit, QMessageBox, QPushButton, QVBoxLayout, QWidget)
 
 from src.app import messages
 from src.core import colour as colour_rules
 from src.core.project import Project
-from src.core.rules import GAP_MAX, GAP_MIN
 from src.io import export, paths
 
 MSG_OUTSIDE = "Choose a folder outside your project folders."
@@ -60,20 +59,14 @@ class ExportDialog(QDialog):
         self.hint = QLabel()
         self.hint.setStyleSheet("color: #9aa0ae;")
 
-        self.gap = QSpinBox()
-        self.gap.setRange(GAP_MIN, GAP_MAX)
-        self.gap.setValue(project.gap)                     # starts at the project's gap; changing it here is for this export only
-        self.gap.valueChanged.connect(self._summary)
         self.fill = QComboBox()
         self.fill.addItem("Transparent colour", project.transparent)
         for c in project.palette():
             if c != project.transparent:
                 self.fill.addItem(colour_rules.to_hex(c), c)
         options = QGridLayout()
-        options.addWidget(QLabel("Gap (0-16 px)"), 0, 0)
-        options.addWidget(self.gap, 0, 1)
-        options.addWidget(QLabel("Fill colour"), 1, 0)
-        options.addWidget(self.fill, 1, 1)
+        options.addWidget(QLabel("Fill colour"), 0, 0)
+        options.addWidget(self.fill, 0, 1)
         options.setColumnStretch(2, 1)
 
         self.result = QLabel("")
@@ -107,7 +100,7 @@ class ExportDialog(QDialog):
         self.frames.setText(str(len(p.frames)))
         self.groups.setText(str(len(p.groups)))
         self.sheets.setText(str(export.sheet_count(p)))
-        w, h = export.largest_sheet(p, self.gap.value())
+        w, h = export.largest_sheet(p)
         self.largest.setText(f"{w} x {h} px")
 
     def _hint(self) -> None:
@@ -133,7 +126,7 @@ class ExportDialog(QDialog):
         if clash and not confirm_replace(self, clash):
             return False
         try:
-            written = export.write_all(p, target, self.gap.value(), self.fill.currentData(), with_data=False)
+            written = export.write_all(p, target, self.fill.currentData(), with_data=False)
         except OSError as e:
             messages.warn(self, f"The files could not be written. {e.strerror or e}")
             return False

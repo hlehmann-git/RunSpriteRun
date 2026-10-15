@@ -5,6 +5,7 @@ from __future__ import annotations
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QComboBox, QLabel, QPushButton, QWidget
 
+from src.app.theme import short_popup
 from src.app.arrow_button import ArrowButton
 from src.app.controller import Controller
 from src.app.panel import PANEL_STYLE, Panel
@@ -22,6 +23,8 @@ class FrameViewPanel(Panel):
         self.controller = controller
         self.number = QComboBox(self)
         self.label = QComboBox(self)
+        short_popup(self.number)
+        short_popup(self.label)
         self.number.setGeometry(104, 8, 64, 26)
         self.label.setGeometry(174, 8, 100, 26)
         self.view = SpriteView(self, grid=controller.settings.grid)

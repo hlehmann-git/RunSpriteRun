@@ -8,13 +8,11 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 EXPORT_MODES = ("sheet", "groups")            # One sheet with all frames / One sheet per Frame Group
-GAP_MIN, GAP_MAX, GAP_DEFAULT = 0, 16, 4
 
 
 @dataclass
 class Settings:
     grid: bool = True                          # pixel grid in the Frame view (default on)
-    gap: int = GAP_DEFAULT                     # sprite sheet gap in pixels
     export_mode: str = "sheet"                 # what the Export Sprite Sheet dialog starts with
 
 
@@ -37,9 +35,6 @@ def load(path: Path | None = None) -> Settings:
         return s
     if isinstance(data.get("grid"), bool):
         s.grid = data["grid"]
-    gap = data.get("gap")
-    if isinstance(gap, int) and not isinstance(gap, bool) and GAP_MIN <= gap <= GAP_MAX:
-        s.gap = gap
     if data.get("export_mode") in EXPORT_MODES:
         s.export_mode = data["export_mode"]
     return s

@@ -42,22 +42,22 @@ def tl(w):
     return w.panels["Timeline and frames"]
 
 
-def test_timeline_shows_nine_and_scrolls(win):
+def test_timeline_shows_eight_and_scrolls(win):
     t = tl(win)
     assert sum(s.isVisibleTo(t) for s in t.slots) == VISIBLE
-    assert t.slots[0].number.text() == "1" and t.bar.maximum() == 3
+    assert t.slots[0].number.text() == "1" and t.bar.maximum() == 4
     t.scroll_by(1)
     assert t.slots[0].number.text() == "2" and t.slots[0].label.text() == "f2"
-    t.bar.setValue(3)
-    assert t.slots[8].number.text() == "12" and not t.right.isEnabled()
+    t.bar.setValue(4)
+    assert t.slots[7].number.text() == "12" and not t.right.isEnabled()
     t.left.click()
-    assert t.first == 2
+    assert t.first == 3
 
 
 def test_selection_follows_and_scrolls_into_view(win):
     t = tl(win)
     win.controller.select(11)
-    assert t.first == 3 and win.panels["Frame view"].number.currentText() == "12"
+    assert t.first == 4 and win.panels["Frame view"].number.currentText() == "12"
     win.controller.select(0)
     assert t.first == 0 and win.panels["Frame view"].label.currentText() == "f1"
     t.slots[4].thumb.pressed.emit(4)
@@ -126,3 +126,9 @@ def test_frame_view_scale_and_transparent(win):
     v = win.panels["Frame view"].view
     img = v.grab().toImage()
     assert img.pixelColor(128, 128).red() in (0, 73, 146)     # drawn, not blank
+
+
+def test_long_frame_lists_drop_down_as_a_short_scrolling_list(win):
+    fv = win.panels["Frame view"]
+    assert fv.number.maxVisibleItems() == 10 and fv.label.maxVisibleItems() == 10
+    assert "combobox-popup: 0" in fv.number.styleSheet()

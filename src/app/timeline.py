@@ -4,9 +4,9 @@ dragging or Ctrl+Left / Ctrl+Right."""
 from __future__ import annotations
 
 from PIL import Image
-from PySide6.QtCore import QEvent, QPoint, QRect, Qt, Signal
+from PySide6.QtCore import QEvent, QPoint, QPointF, QRect, Qt, Signal
 from PySide6.QtWidgets import QApplication
-from PySide6.QtGui import QColor, QKeySequence, QPainter, QPen, QShortcut
+from PySide6.QtGui import QColor, QKeySequence, QPainter, QPen, QPolygonF, QShortcut
 from PySide6.QtWidgets import QLabel, QLineEdit, QScrollBar, QToolButton, QWidget
 
 from src.app.controller import Controller
@@ -17,12 +17,12 @@ from src.app.render import scaled_sprite, to_qimage
 from src.core.edit import group_of_frame
 from src.core.rules import LABEL_MAX
 
-VISIBLE = 9
-BOX_W, BOX_H, PITCH = 112, 72, 118       # a frame box and the distance between boxes
-FIRST_X = 149                            # left edge of the first box in the panel
-THUMB_Y = 32
+VISIBLE = 8
+BOX_W, BOX_H, PITCH = 112, 112, 118       # a frame box and the distance between boxes
+FIRST_X = 272                            # left edge of the first box in the panel
+THUMB_Y = 42
 ROW_H = 16
-NUMBER_Y, LABEL_Y, GROUP_Y = 108, 128, 148
+NUMBER_Y, LABEL_Y, GROUP_Y = 158, 178, 198
 DRAG_START = 6                           # pixels the pointer must move before a drag begins
 
 BORDER = QColor(0x3A, 0x3D, 0x47)
@@ -68,7 +68,7 @@ class Thumb(QWidget):
             shrink = max(-(-img.width // inner_w), -(-img.height // inner_h))     # frames bigger than the box: whole-number shrink
             if shrink > 1:
                 img = img.resize((max(1, img.width // shrink), max(1, img.height // shrink)), Image.NEAREST)
-            sprite = scaled_sprite(img, self.transparent, inner_w, inner_h, grid=False)
+            sprite = scaled_sprite(img, self.transparent, inner_w, inner_h, grid=False, hide=True)
             qimg = to_qimage(sprite, dpr)
             x = (BOX_W - sprite.width / dpr) / 2
             y = (BOX_H - sprite.height / dpr) / 2
@@ -108,7 +108,7 @@ class Slot(QWidget):
         super().__init__(parent)
         self.slot = slot
         self.copied = False
-        self.setGeometry(FIRST_X + slot * PITCH, 0, BOX_W, 170)
+        self.setGeometry(FIRST_X + slot * PITCH, 0, BOX_W, 220)
         self.thumb = Thumb(self, slot)
         self.thumb.move(0, THUMB_Y)
         self.number = self._cell(NUMBER_Y)
@@ -140,6 +140,29 @@ class Slot(QWidget):
             self.label.setStyleSheet(self._style(True, copied))
 
 
+class ArrowButton(QToolButton):
+    """A light grey triangle (left or right), larger than the standard arrow so it does not get lost in the dark UI."""
+
+    def __init__(self, parent: QWidget, direction: int) -> None:
+        super().__init__(parent)
+        self.direction = direction                      # -1 left, +1 right
+        self.setAutoRaise(True)
+        self.setCursor(Qt.PointingHandCursor)
+
+    def paintEvent(self, event) -> None:
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        if self.isEnabled():
+            colour = QColor("#ffffff") if self.underMouse() else QColor("#c8ccd8")
+        else:
+            colour = QColor("#4a4e5a")
+        c, h, w = self.rect().center(), 11, 9
+        tip, base = c.x() + self.direction * w // 2 + (1 if self.direction > 0 else -1), c.x() - self.direction * w // 2
+        p.setPen(Qt.NoPen)
+        p.setBrush(colour)
+        p.drawPolygon(QPolygonF([QPointF(tip, c.y()), QPointF(base, c.y() - h), QPointF(base, c.y() + h)]))
+
+
 class TimelinePanel(Panel):
     def __init__(self, parent: QWidget, controller: Controller) -> None:
         super().__init__("Timeline and frames", parent)
@@ -153,26 +176,25 @@ class TimelinePanel(Panel):
             s.label.editingFinished.connect(lambda s=s: self._label_done(s))
         for i, (text, y) in enumerate((("Frame number", NUMBER_Y), ("Frame Label", LABEL_Y), ("Frame Group", GROUP_Y))):
             lab = QLabel(text, self)
-            lab.setGeometry(16, y, FIRST_X - 24, ROW_H)
+            lab.setGeometry(FIRST_X - 88, y, 82, ROW_H)
             lab.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
             lab.setStyleSheet("font-size:11px;")
         self.pad = KeyPad(self)                # FR-3.12: the keys held, drawn small at the left of the frames
-        self.pad.move(16, 34)
+        self.pad.move(14, THUMB_Y)
+        self.pad.colour_of = self._key_colour
         controller.keys_held.connect(self.pad.set_held)
         controller.project_changed.connect(lambda: self.pad.set_held([]))
         for s in self.slots:
             s.label.installEventFilter(self)
         QApplication.instance().installEventFilter(self)
-        self.left = QToolButton(self)
-        self.right = QToolButton(self)
-        for btn, arrow, x in ((self.left, Qt.LeftArrow, 119), (self.right, Qt.RightArrow, 1213)):
-            btn.setArrowType(arrow)
-            btn.setAutoRaise(True)
-            btn.setGeometry(x, THUMB_Y + 20, 24, 32)
+        self.left = ArrowButton(self, -1)
+        self.right = ArrowButton(self, 1)
+        for btn, x in ((self.left, FIRST_X - 30), (self.right, FIRST_X + VISIBLE * PITCH - 2)):
+            btn.setGeometry(x, THUMB_Y + 36, 26, 40)
         self.left.clicked.connect(lambda: self.scroll_by(-1))
         self.right.clicked.connect(lambda: self.scroll_by(1))
         self.bar = QScrollBar(Qt.Horizontal, self)
-        self.bar.setGeometry(FIRST_X, 170, VISIBLE * PITCH - 6, 12)
+        self.bar.setGeometry(FIRST_X, 220, VISIBLE * PITCH - 6, 12)
         self.bar.setStyleSheet(SCROLLBAR_STYLE)
         self.bar.valueChanged.connect(self._bar_moved)
         self.marker = QWidget(self)
@@ -268,6 +290,11 @@ class TimelinePanel(Panel):
         self.right.setEnabled(self.first < n - VISIBLE)
 
     # ---- scrolling --------------------------------------------------------------------------
+    def _key_colour(self, key: str):
+        p = self.controller.project
+        g = next((g for g in p.groups if g.key == key), None) if p else None
+        return QColor(*g.colour) if g else None
+
     def scroll_by(self, delta: int) -> None:
         self.bar.setValue(self.first + delta)
 
@@ -296,7 +323,7 @@ class TimelinePanel(Panel):
         return max(0, min(self.frame_count(), g))
 
     def _in_strip(self, pos: QPoint) -> bool:
-        return QRect(FIRST_X - 20, THUMB_Y - 8, VISIBLE * PITCH + 40, 170 - THUMB_Y).contains(pos)
+        return QRect(FIRST_X - 20, THUMB_Y - 8, VISIBLE * PITCH + 40, 220 - THUMB_Y).contains(pos)
 
     def _drag_move(self, slot: int, pos: QPoint) -> None:
         if self.controller.edit.mode:

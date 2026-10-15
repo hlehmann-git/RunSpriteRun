@@ -13,7 +13,7 @@ from src.core.systems import SYSTEMS, get_system
 from src.io import blank_file
 
 ST = get_system("Atari ST")
-GREEN, WHITE = (0, 255, 0), (255, 255, 255)
+GREEN, WHITE = (0, 255, 0), (255, 0, 255)      # (WHITE is the old name: the default fill is now magenta)
 
 
 @pytest.fixture(scope="module")
@@ -55,7 +55,7 @@ def test_text_lines_use_the_system_data():
     assert len(lines) == 5
     assert "Atari ST" in lines[0] and "3 bits per channel" in lines[1] and "512" in lines[1]
     assert "16 colours" in lines[2] and "32 x 32 pixels, 10 per row, 4 rows (40 sprites)" in lines[3]
-    assert "#00FF00" in lines[4] and "#FFFFFF" in lines[4]
+    assert "#00FF00" in lines[4] and "#FF00FF" in lines[4]
     assert "4,096" in bs.text_lines(get_system("Amiga"), 8, 8, 1, 1, GREEN, WHITE)[1]
 
 

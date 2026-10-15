@@ -12,24 +12,29 @@ from PySide6.QtWidgets import QLabel, QWidget
 from src.app.controller import Controller
 from src.app.panel import Panel
 
-HELD_BG, HELD_FG = QColor("#9fd3ff"), QColor("#8b0000")
-KEY_BG, KEY_FG, KEY_EDGE = QColor("#1e1f24"), QColor("#e6e8ee"), QColor("#4a4e5a")
-# (key, x, y, size, round?) inside the 100 x 60 pad
+HELD_BG, HELD_FG = QColor("#9fd3ff"), QColor("#14141a")      # a held key is filled with its group's colour (this if none)
+KEY_BG, KEY_FG, KEY_EDGE = QColor("#1e1f24"), QColor("#e6e8ee"), QColor("#78808c")
+PAD_W, PAD_H = 156, 142
+# (key, centre x, centre y, size, round?) inside the pad: W A S D as a cross, the four "+" diagonals between them, 1 to 6 as round buttons
+_CX, _CY, _STEP = 78, 52, 31
 KEY_LAYOUT = (
-    [("W", 16, 8, 14, False), ("A", 2, 22, 14, False), ("D", 30, 22, 14, False), ("S", 16, 36, 14, False)]
-    + [(str(n), 52 + 16 * ((n - 1) % 3), 15 + 16 * ((n - 1) // 3), 14, True) for n in range(1, 7)]
+    [("W", _CX, _CY - _STEP, 25, False), ("A", _CX - _STEP, _CY, 25, False),
+     ("S", _CX, _CY + _STEP, 25, False), ("D", _CX + _STEP, _CY, 25, False),
+     ("W+A", _CX - _STEP, _CY - _STEP, 20, False), ("W+D", _CX + _STEP, _CY - _STEP, 20, False),
+     ("S+A", _CX - _STEP, _CY + _STEP, 20, False), ("S+D", _CX + _STEP, _CY + _STEP, 20, False)]
+    + [(str(n), 21 + 23 * (n - 1), 118, 20, True) for n in range(1, 7)]      # 1 to 6 in one row under the cross
 )
 
 
-PAD_W, PAD_H = 100, 60
-
-
 class KeyPad(QWidget):
+    """Shows only which keys are held. It never shows which keys have a group (colour fills a key only while it is held)."""
+
     def __init__(self, parent: QWidget) -> None:
         super().__init__(parent)
         self.setFixedSize(PAD_W, PAD_H)
         self.setAccessibleName("Keys held")
         self.held: set[str] = set()
+        self.colour_of = lambda key: None               # set by the timeline: a key's group colour, or None
 
     def set_held(self, keys) -> None:
         self.held = set(keys)
@@ -38,27 +43,28 @@ class KeyPad(QWidget):
     def paintEvent(self, event) -> None:
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
-        p.setPen(QPen(QColor("#5a5e6b"), 1))
+        p.setPen(QPen(QColor("#626674"), 1.5))
         p.setBrush(QColor("#3b3e48"))
-        p.drawRoundedRect(QRectF(0.5, 0.5, PAD_W - 1, PAD_H - 1), 16, 16)
+        p.drawRoundedRect(QRectF(1, 1, PAD_W - 2, PAD_H - 2), 24, 24)
         p.setPen(Qt.NoPen)
-        p.setBrush(KEY_BG)
-        p.drawRect(16, 22, 14, 14)                       # the middle of the cross
+        p.setBrush(QColor("#2c2e38"))
+        p.drawRect(_CX - 12, _CY - 12, 25, 25)           # the middle of the cross
         font = QFont(self.font())
-        font.setPixelSize(8)
         font.setBold(True)
-        p.setFont(font)
-        for key, x, y, size, round_ in KEY_LAYOUT:
+        for key, cx, cy, size, round_ in KEY_LAYOUT:
             on = key in self.held
-            p.setPen(QPen(KEY_EDGE, 1))
-            p.setBrush(HELD_BG if on else KEY_BG)
-            rect = QRectF(x + 0.5, y + 0.5, size - 1, size - 1)
+            rect = QRectF(cx - size / 2, cy - size / 2, size, size)
+            fill = (self.colour_of(key) or HELD_BG) if on else KEY_BG
+            p.setPen(QPen(fill if on else KEY_EDGE, 1))
+            p.setBrush(fill)
             if round_:
                 p.drawEllipse(rect)
             else:
-                p.drawRoundedRect(rect, 2, 2)
+                p.drawRoundedRect(rect, 6, 6)
+            font.setPixelSize(18 if "+" in key else 14 if not round_ else 12)
+            p.setFont(font)
             p.setPen(HELD_FG if on else KEY_FG)
-            p.drawText(QRectF(x, y, size, size), Qt.AlignCenter, key)
+            p.drawText(rect, Qt.AlignCenter, "+" if "+" in key else key)
 
 
 class KeysPanel(Panel):

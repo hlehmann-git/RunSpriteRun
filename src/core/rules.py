@@ -10,11 +10,12 @@ MAX_GROUPS = 32
 MIN_SIZE, MAX_SIZE = 4, 128
 FPS_CHOICES = (3, 6, 12, 24)
 DEFAULT_FPS = 12
-GAP_MIN, GAP_MAX, DEFAULT_GAP = 0, 16, 4
 PROJECT_NAME_MAX = 40
 LABEL_MAX = 40
 GROUP_NAME_MAX = 20
-KEYS = ("W", "A", "S", "D", "1", "2", "3", "4", "5", "6")
+DIAGONALS = {"W+A": ("W", "A"), "W+D": ("W", "D"), "S+D": ("S", "D"), "S+A": ("S", "A")}   # two direction keys held together
+KEY_LABELS = {"W+A": "W+A (up-left)", "W+D": "W+D (up-right)", "S+D": "S+D (down-right)", "S+A": "S+A (down-left)"}
+KEYS = ("W", "A", "S", "D", "W+A", "W+D", "S+D", "S+A", "1", "2", "3", "4", "5", "6")
 
 
 def valid_name(text: str, max_len: int) -> bool:

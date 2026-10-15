@@ -45,7 +45,6 @@ class Project:
     height: int
     fps: int = DEFAULT_FPS
     transparent: Colour = (0, 0, 0)
-    gap: int = 4                 # sprite sheet gap in pixels (0 to 16), used by Save and as Export's starting value
     frames: list[Frame] = field(default_factory=list)
     groups: list[Group] = field(default_factory=list)
     start_state: Rule | None = None

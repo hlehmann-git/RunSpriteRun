@@ -28,16 +28,16 @@ def sheet_count(project: Project) -> int:
     return 1 + len(project.groups)
 
 
-def largest_sheet(project: Project, gap: int) -> tuple[int, int]:
+def largest_sheet(project: Project) -> tuple[int, int]:
     """Size of the biggest sheet that a write would make (for the Export window summary)."""
     colours = len(project.palette())
-    sizes = [sheets.sheet_size(len(project.frames), project.width, project.height, gap, colours)]
+    sizes = [sheets.sheet_size(len(project.frames), project.width, project.height, colours)]
     for g in project.groups:
-        sizes.append(sheets.sheet_size(g.last - g.first + 1, project.width, project.height, gap, colours))
+        sizes.append(sheets.sheet_size(g.last - g.first + 1, project.width, project.height, colours))
     return max(sizes, key=lambda s: s[0] * s[1])
 
 
-def write_all(project: Project, folder: Path, gap: int, fill: Colour, with_data: bool) -> list[str]:
+def write_all(project: Project, folder: Path, fill: Colour, with_data: bool) -> list[str]:
     """Write every sheet, every frame PNG and (when asked) the frame data files under `folder`. The three folders
     are created even when nothing goes in one. Returns the relative paths written. Raises OSError."""
     folder = Path(folder)
@@ -46,7 +46,7 @@ def write_all(project: Project, folder: Path, gap: int, fill: Colour, with_data:
     written: list[str] = []
 
     def put_sheet(rel_folder: str, file_name: str, indices: list[int]) -> None:
-        sheet = sheets.build_sheet(project, indices, gap, fill)
+        sheet = sheets.build_sheet(project, indices, fill)
         sheet.image.save(folder / rel_folder / file_name, format="PNG")
         written.append(f"{rel_folder}/{file_name}")
         if with_data:

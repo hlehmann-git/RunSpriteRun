@@ -42,3 +42,10 @@ def apply_dark_theme(app: QApplication) -> None:
     for role in (QPalette.WindowText, QPalette.Text, QPalette.ButtonText):
         p.setColor(QPalette.Disabled, role, DISABLED)
     app.setPalette(p)
+
+
+def short_popup(combo, rows: int = 10) -> None:
+    """A long list (every frame of a project, up to 120) drops down as a scrolling list of `rows` lines,
+    not one giant list that runs off the top and bottom of the screen."""
+    combo.setMaxVisibleItems(rows)
+    combo.setStyleSheet("combobox-popup: 0;")

@@ -61,7 +61,7 @@ def test_no_highlight_when_a_frame_is_held_and_highlight_when_looping(win):
 def test_key_pad_is_in_the_timeline_and_the_keys_slot_is_empty(win):
     tl = timeline(win)
     keys = win.panels["Keys"]
-    assert tl.pad.parent() is tl and tl.pad.width() == 100 and tl.pad.height() == 60
+    assert tl.pad.parent() is tl and tl.pad.width() == 156 and tl.pad.height() == 142
     assert tl.pad.geometry().right() < tl.left.geometry().left()
     assert (keys.width(), keys.height()) == (688, 208)      # 1.b: runs to the right edge of the window
     assert keys.title.isHidden() and not keys.findChildren(type(tl.pad))

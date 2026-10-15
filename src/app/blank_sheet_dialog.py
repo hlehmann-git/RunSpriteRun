@@ -84,7 +84,7 @@ class BlankSheetDialog(QDialog):
         rows = (("System", self.system, None), ("Sprite width (4-128 px)", self.width_box, None),
                 ("Sprite height (4-128 px)", self.height_box, None), ("Sprites per row", self.per_row, None),
                 ("Number of rows", self.rows, None), ("Box colour", self.box_colour, note("Not used in the sprites")),
-                ("Fill colour", self.fill_colour, note("Empty box inside")))
+                ("Transparent colour", self.fill_colour, note("Empty box inside")))
         for r, (label, widget, extra) in enumerate(rows):
             grid.addWidget(QLabel(label), r, 0)
             grid.addWidget(widget, r, 1, Qt.AlignLeft)

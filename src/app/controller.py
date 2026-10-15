@@ -10,7 +10,6 @@ from src.app import messages
 from src.app.edit_session import EditSession
 from src.core import edit, groups, history, palette
 from src.core.project import Rule
-from src.core.rules import GAP_MAX, GAP_MIN
 from src.core.project import Project
 from src.core.runner import Runner
 from src.io import settings as settings_io
@@ -210,17 +209,6 @@ class Controller(QObject):
         self.frames_changed.emit()
         return True
 
-    def set_gap(self, gap: int) -> bool:
-        """Sprite sheet gap of the open project (FR-3.14). Undoable."""
-        p = self.project
-        if p is None or gap == p.gap or not GAP_MIN <= gap <= GAP_MAX:
-            return False
-        before = self.checkpoint()
-        p.gap = gap
-        self.commit(before)
-        self.frames_changed.emit()
-        return True
-
     def apply_settings(self, new: settings_io.Settings) -> None:
         self.settings = new
         settings_io.save(new)
@@ -295,21 +283,21 @@ class Controller(QObject):
     def start_with_key(self, key: str) -> bool:
         """RunSpriteRun is stopped and a key that has a Frame Group is pressed: start it (as F5 does) and
         play that group. Keys with no group do nothing."""
-        if self.runner is None or self.running or self.edit.mode or self.runner._group_for_key(key) is None:
+        if self.runner is None or self.running or self.edit.mode or not self.runner._matters(key):
             return False
         self.toggle_run()
         return self.key_press(key)
 
     def key_press(self, key: str) -> bool:
         if self.runner is not None and self.runner.press(key):
-            self.keys_held.emit(list(self.runner.held))
+            self.keys_held.emit(self.runner.lit())
             self._show_run()
             return True
         return False
 
     def key_release(self, key: str) -> bool:
         if self.runner is not None and self.runner.release(key):
-            self.keys_held.emit(list(self.runner.held))
+            self.keys_held.emit(self.runner.lit())
             self._show_run()
             return True
         return False

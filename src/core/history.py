@@ -20,19 +20,18 @@ class Snapshot:
     start_state: Rule | None
     fps: int
     transparent: Colour
-    gap: int = 4
     extra_colours: tuple = ()
 
     def same_as(self, other: "Snapshot") -> bool:
         return (len(self.frames) == len(other.frames)
                 and all(a[0] == b[0] and a[1] is b[1] and a[2] == b[2] and a[3] is b[3] for a, b in zip(self.frames, other.frames))
                 and self.groups == other.groups and self.start_state == other.start_state
-                and self.fps == other.fps and self.transparent == other.transparent and self.gap == other.gap and self.extra_colours == other.extra_colours)
+                and self.fps == other.fps and self.transparent == other.transparent and self.extra_colours == other.extra_colours)
 
 
 def take(project: Project) -> Snapshot:
     return Snapshot([(f.label, f.image, f.copied, f.layers) for f in project.frames], copy.deepcopy(project.groups),
-                    copy.deepcopy(project.start_state), project.fps, project.transparent, project.gap,
+                    copy.deepcopy(project.start_state), project.fps, project.transparent,
                     tuple(project.extra_colours))
 
 
@@ -42,7 +41,6 @@ def restore(project: Project, snap: Snapshot) -> None:
     project.start_state = copy.deepcopy(snap.start_state)
     project.fps = snap.fps
     project.transparent = snap.transparent
-    project.gap = snap.gap
     project.extra_colours = list(snap.extra_colours)
     project.dirty = True
 

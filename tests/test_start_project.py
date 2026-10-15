@@ -219,3 +219,14 @@ def test_canvas_smaller_than_sprites_is_refused(app, tmp_path):
     d.size_radio.setChecked(True)
     d.width_box.setValue(12); d.height_box.setValue(20)
     assert not d.create_btn.isEnabled() and "at least 16 x 16" in d.summary.text()
+
+
+def test_chosen_sheet_name_is_shown_and_cleared(app, tmp_path):
+    from PIL import Image
+    d = StartProjectDialog(folder=str(tmp_path))
+    assert d.sheet_name.isReadOnly() and d.sheet_name.text() == ""
+    Image.new("RGB", (20, 20), (255, 0, 255)).save(tmp_path / "MySheet.png")
+    d.set_sheet(tmp_path / "MySheet.png")
+    assert d.sheet_name.text() == "MySheet.png"
+    d.files_radio.setChecked(True)
+    assert d.sheet_name.text() == ""

@@ -16,7 +16,7 @@ LINE_H = 11
 BG: Colour = (224, 224, 224)           # text bar and any space beside the boxes
 TEXT: Colour = (0, 0, 0)
 DEFAULT_BOX: Colour = (0, 255, 0)      # the "not used" bounding box colour
-DEFAULT_FILL: Colour = (255, 255, 255)   # inside of an empty box: white (the art program sets any transparent colour)
+DEFAULT_FILL: Colour = (255, 0, 255)   # inside of an empty box: magenta, the transparent colour
 FOLDER = "Blank sprite sheets"
 
 FOLDER_NAMES = {
@@ -29,7 +29,7 @@ FOLDER_NAMES = {
 }
 
 MSG_TOO_MANY = "A blank sprite sheet can hold at most 120 sprites and be 2,048 pixels wide."
-MSG_SAME_COLOUR = "The box colour and the fill colour must be different."
+MSG_SAME_COLOUR = "The box colour and the transparent colour must be different."
 
 
 def system_folder(system: System) -> str:
@@ -57,27 +57,29 @@ def problem(w: int, h: int, per_row: int, rows: int, box: Colour, fill: Colour) 
     return None
 
 
-def text_lines(system: System, w: int, h: int, per_row: int, rows: int, box: Colour, fill: Colour) -> list[str]:
+def text_lines(system: System, w: int, h: int, per_row: int, rows: int, box: Colour, fill: Colour,
+               title: str = "blank sprite sheet", count: int | None = None) -> list[str]:
     hexs = lambda c: "#%02X%02X%02X" % tuple(c)
     return [
-        f"RunSpriteRun blank sprite sheet: {system.name}",
+        f"RunSpriteRun {title}: {system.name}",
         f"Colour depth: {system.depth_label}, {system.bits} bits per channel ({system.levels} levels). "
         f"{system.total_colours:,} colours available.",
         f"Palette limit: at most {system.max_colours} colours in all the sprites, including the transparent colour.",
-        f"Sprites: {w} x {h} pixels, {per_row} per row, {rows} rows ({per_row * rows} sprites).",
+        f"Sprites: {w} x {h} pixels, {per_row} per row, {rows} rows ({per_row * rows if count is None else count} sprites).",
         f"The {hexs(box)} lines are guides: do not use that colour in the sprites. "
         f"Empty boxes are {hexs(fill)}.",
     ]
 
 
 def build(system: System, w: int, h: int, per_row: int, rows: int, box: Colour = DEFAULT_BOX,
-          fill: Colour = DEFAULT_FILL) -> Image.Image:
+          fill: Colour = DEFAULT_FILL, title: str = "blank sprite sheet", count: int | None = None,
+          extra_height: int = 0) -> Image.Image:
     """The sheet: a text bar on top, then the grid of boxes. The inside of each box is exactly w x h pixels."""
     width, height = sheet_size(w, h, per_row, rows)
-    img = Image.new("RGB", (width, height), BG)
+    img = Image.new("RGB", (width, height + extra_height), BG)       # extra_height: room under the boxes (colour bar)
     draw = ImageDraw.Draw(img)
     font = ImageFont.load_default(size=10)
-    for n, line in enumerate(text_lines(system, w, h, per_row, rows, box, fill)):
+    for n, line in enumerate(text_lines(system, w, h, per_row, rows, box, fill, title, count)):
         draw.text((MARGIN, MARGIN - 2 + n * LINE_H), line, fill=TEXT, font=font)
     grid_w, grid_h = per_row * (w + 1) + 1, rows * (h + 1) + 1
     draw.rectangle((0, BAR_H, grid_w - 1, BAR_H + grid_h - 1), fill=box)

@@ -23,7 +23,7 @@ def save_whole(project: Project, rsr_path: str | Path) -> None:
             folder.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, dest)
         project.source_sheet = None
-    written = export.write_all(project, folder, project.gap, project.transparent, with_data=True)
+    written = export.write_all(project, folder, project.transparent, with_data=True)
     project.written_files = written
     try:
         save_project(project, rsr_path)

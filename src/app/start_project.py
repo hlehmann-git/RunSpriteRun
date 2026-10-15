@@ -28,6 +28,7 @@ DEFAULT_SYSTEM = "Atari ST"
 NAME_HINT = "Letters, numbers, - and _ only (no spaces), 1 to 40 characters"
 NAME_ERROR = "Project names can only use letters, numbers, - and _ (no spaces)."
 GREY = "color: #8a8a94;"
+ORANGE = "color: #ff9828;"                    # a problem that stops Create Project
 BLANK_FRAMES_DEFAULT = 12
 BLANK_SIZE_DEFAULT = 32
 INDENT = 24
@@ -199,7 +200,11 @@ class StartProjectDialog(QDialog):
         sheet_row.addWidget(self.sheet_radio)
         sheet_row.addWidget(self.sheet_browse)
         sheet_row.addWidget(self.sheet_info)
-        sheet_row.addStretch(1)
+        self.sheet_name = QLineEdit()                     # the chosen sheet, shown so it is clear what is being used
+        self.sheet_name.setReadOnly(True)
+        self.sheet_name.setPlaceholderText("No sheet chosen")
+        self.sheet_name.setFocusPolicy(Qt.NoFocus)
+        sheet_row.addWidget(self.sheet_name, 1)
         grid.addLayout(sheet_row, 11, 0, 1, 2)
         colours_row = QHBoxLayout()
         colours_row.setContentsMargins(INDENT, 0, 0, 0)
@@ -208,8 +213,8 @@ class StartProjectDialog(QDialog):
         self.box_colour = ColourField(self, (0, 255, 0))
         colours_row.addWidget(self.box_colour)
         colours_row.addSpacing(8)
-        colours_row.addWidget(QLabel("Fill colour"))
-        self.fill_colour = ColourField(self, (255, 255, 255))
+        colours_row.addWidget(QLabel("Transparent colour"))
+        self.fill_colour = ColourField(self, (255, 0, 255))
         colours_row.addWidget(self.fill_colour)
         colours_row.addStretch(1)
         grid.addLayout(colours_row, 12, 0, 1, 2)
@@ -301,7 +306,7 @@ class StartProjectDialog(QDialog):
         name_ok = valid_project_name(text)
         if text and not name_ok:
             self.name_hint.setText(NAME_ERROR)
-            self.name_hint.setStyleSheet("color: #e5736b;")
+            self.name_hint.setStyleSheet(ORANGE)
         else:
             self.name_hint.setText(NAME_HINT)
             self.name_hint.setStyleSheet(GREY)
@@ -327,12 +332,12 @@ class StartProjectDialog(QDialog):
                 box.blockSignals(False)
         small = (not auto and not blank and found is not None
                  and (self.width_box.value() < found[0] or self.height_box.value() < found[1]))
-        self.summary.setStyleSheet("color: #e5736b;" if small else GREY)
+        self.summary.setStyleSheet(ORANGE if small else GREY)
 
         n = len(self._files)
         if blank:
             taken = self._blank_folder_taken()
-            self.summary.setStyleSheet("color: #e5736b;" if taken else GREY)
+            self.summary.setStyleSheet(ORANGE if taken else GREY)
             self.summary.setText(f"A project called {text} already exists in the Projects folder. Choose another name."
                                  if taken else f"{self.blank_frames.value()} empty frames, "
                                  f"{self.width_box.value()} x {self.height_box.value()}")
@@ -349,6 +354,7 @@ class StartProjectDialog(QDialog):
                 self.create_btn.setEnabled(False)
                 return
             if self._grid.error:
+                self.summary.setStyleSheet(ORANGE)
                 self.summary.setText(f"{self._sheet_path.name}: {self._grid.error}")
             else:
                 self.summary.setText(f"{self._sheet_path.name}: {len(self._grid.boxes)} boxes, "
@@ -413,6 +419,7 @@ class StartProjectDialog(QDialog):
         self._refresh()
 
     def _clear_sheet(self) -> None:
+        self.sheet_name.clear()
         self._sheet_path = None
         self._sheet_image = None
         self._grid = sheet_import.SheetGrid()
@@ -439,6 +446,8 @@ class StartProjectDialog(QDialog):
         self.sheet_radio.setChecked(True)
         self._files, self._sizes = [], []
         self._sheet_path = Path(path)
+        self.sheet_name.setText(self._sheet_path.name)
+        self.sheet_name.setCursorPosition(0)
         self._scan_sheet()
 
     def _sheet_colours(self) -> None:
@@ -492,7 +501,7 @@ class StartProjectDialog(QDialog):
     def _create_from_sheet(self) -> None:
         g = self._grid
         if self.box_colour.colour == self.fill_colour.colour:
-            messages.warn(self, "The box colour and the fill colour must be different.")
+            messages.warn(self, "The box colour and the transparent colour must be different.")
             return
         system = self.selected_system()
         result = sheet_import.import_sheet(self._sheet_image, self._sheet_path.stem, g,
@@ -509,11 +518,8 @@ class StartProjectDialog(QDialog):
                                    "Continue without these sprites", "Back"):
                 return
         if result.adjustments:
-            lines = [f"{a.count} colours in {a.file} were adjusted to the nearest colour valid for {system.name}."
-                     for a in result.adjustments]
-            details = "\n".join(f"{a.file}: " + ", ".join(f"{o} -> {n}" for o, n in a.details)
-                                for a in result.adjustments)
-            messages.adjusted(self, lines, details)
+            messages.adjusted(self, [f"Colours in this sprite sheet were adjusted to the nearest colour valid for "
+                                     f"{system.name}."], "")
         size = (g.width, g.height)
         canvas = self._larger_canvas(size)
         if canvas:
@@ -573,12 +579,8 @@ class StartProjectDialog(QDialog):
             messages.warn(self, "No valid files are left, so no project was created.")
             return
         if result.adjustments:
-            lines = [a_msg for a_msg in
-                     (f"{a.count} colours in {a.file} were adjusted to the nearest colour valid for {system.name}."
-                      for a in result.adjustments)]
-            details = "\n".join(f"{a.file}: " + ", ".join(f"{o} -> {n}" for o, n in a.details)
-                                for a in result.adjustments)
-            messages.adjusted(self, lines, details)
+            messages.adjusted(self, [f"Colours in these image files were adjusted to the nearest colour valid for "
+                                     f"{system.name}."], "")
 
         if canvas:
             self._centre_on_canvas(result, canvas)

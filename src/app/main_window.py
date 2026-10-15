@@ -51,7 +51,7 @@ REGIONS = [
     ("Set Frame Group", 16, 384, 544, 208),
     ("Keys", 576, 384, 688, 208),
     ("Colour editor", 928, 114, 336, 204),    # card bottom half, directly under the palette
-    ("Timeline and frames", 16, 608, 1248, 184),
+    ("Timeline and frames", 16, 608, 1248, 234),
 ]
 
 
@@ -126,7 +126,7 @@ class MainWindow(QMainWindow):
         if large:
             g("Frame view", 16, 44, 544, EDIT_FRAME_H)
             g("Frame Group Preview", 576, 44, 288, 324)
-            g("Timeline and frames", 16, 44 + EDIT_FRAME_H + 16, 1248, 184)
+            g("Timeline and frames", 16, 44 + EDIT_FRAME_H + 16, 1248, 234)
         else:
             for name, x, y, w, h in REGIONS:
                 if name in ("Frame view", "Frame Group Preview", "Timeline and frames"):

@@ -5,6 +5,7 @@ from __future__ import annotations
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import QComboBox, QLabel, QPushButton, QWidget
 
+from src.app.theme import short_popup
 from src.app.arrow_button import ArrowButton
 from src.app.controller import Controller
 from src.app.panel import Panel
@@ -24,6 +25,7 @@ class GroupPreviewPanel(Panel):
         self.controller = controller
         self.chooser = QComboBox(self)
         self.chooser.setGeometry(179, 8, 96, 26)
+        short_popup(self.chooser)
         self.view = SpriteView(self, grid=False)
         self.view.move(16, 38)
         self.play_btn = QPushButton("Play", self)

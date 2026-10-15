@@ -29,13 +29,13 @@ def test_find_grid(tmp_path):
 
 def test_wrong_box_colour(tmp_path):
     _, im = sheet(tmp_path)
-    assert sheet_import.find_grid(im, (255, 0, 255)).error == sheet_import.MSG_NO_BOXES
+    assert sheet_import.find_grid(im, (1, 2, 3)).error == sheet_import.MSG_NO_BOXES
 
 
 def test_empty_boxes_left_out(tmp_path):
     _, im = sheet(tmp_path)
     g = sheet_import.find_grid(im, (0, 255, 0))
-    res = sheet_import.import_sheet(im, "mysheet", g, (255, 255, 255), ST)
+    res = sheet_import.import_sheet(im, "mysheet", g, (255, 0, 255), ST)
     assert [f.label for f in res.frames] == ["mysheet_001", "mysheet_003"]
     assert res.can_create
 
@@ -43,7 +43,7 @@ def test_empty_boxes_left_out(tmp_path):
 def test_all_empty(tmp_path):
     _, im = sheet(tmp_path, ())
     g = sheet_import.find_grid(im, (0, 255, 0))
-    assert sheet_import.import_sheet(im, "s", g, (255, 255, 255), ST).rejected == sheet_import.MSG_ALL_EMPTY
+    assert sheet_import.import_sheet(im, "s", g, (255, 0, 255), ST).rejected == sheet_import.MSG_ALL_EMPTY
 
 
 def test_dialog_and_save_copies_sheet(tmp_path, qtbot=None):
@@ -59,7 +59,7 @@ def test_dialog_and_save_copies_sheet(tmp_path, qtbot=None):
     assert d.file_list.count() == 6
     d._create()
     proj = d.project
-    assert len(proj.frames) == 2 and proj.transparent == (255, 255, 255)
+    assert len(proj.frames) == 2 and proj.transparent == (255, 0, 255)
     out = tmp_path / "Demo"
     out.mkdir()
     save_whole(proj, out / "Demo.rsr")
@@ -74,7 +74,7 @@ def test_too_many_colours_rejects_sheet(tmp_path):
             im.putpixel((x + dx, y), (i * 36, 0, 0))
         im.putpixel((x, y + 1), (0, i * 36 + 36, 0))
         im.putpixel((x + 1, y + 1), (0, 0, i * 36 + 36))
-    res = sheet_import.import_sheet(im, "s", g, (255, 255, 255), ST)
+    res = sheet_import.import_sheet(im, "s", g, (255, 0, 255), ST)
     assert res.rejected == sheet_import.msg_sheet_colours("Atari ST", 16)
 
 

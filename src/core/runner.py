@@ -3,13 +3,15 @@ and the time passing. No UI code here; the app calls tick() once per frame time 
 from __future__ import annotations
 
 from .project import Project, Rule
+from .rules import DIAGONALS
 
 
 class Runner:
     def __init__(self, project: Project) -> None:
         self.project = project
         self.running = False
-        self.held: list[str] = []                 # assigned keys held, oldest first
+        self.held: list[str] = []                 # keys held that matter (own group, or part of a diagonal group), oldest first
+        self._current: str | None = None          # the key whose group is playing (a diagonal such as W+D counts as one key)
         self._seq: list[int] = []                 # frames of the group being played
         self._pos = 0
         self.frame = 0                            # the frame being shown
@@ -61,38 +63,61 @@ class Runner:
     # ---- F5 -------------------------------------------------------------------------------------
     def start(self) -> None:
         self.held.clear()
+        self._current = None
         self.running = True
         self._show_start_state()
 
     def stop(self) -> None:
         """F5 again: stop and return the display to the start state. There is no pause."""
         self.held.clear()
+        self._current = None
         self.running = False
         self._show_start_state()
         # the display is static now: a start state that plays a group shows that group's first frame
         self._seq = []
 
     # ---- keys -----------------------------------------------------------------------------------
+    def _matters(self, key: str) -> bool:
+        """A key counts if it has its own group, or it is one half of a diagonal that has a group."""
+        return self._group_for_key(key) is not None or any(
+            key in parts and self._group_for_key(d) is not None for d, parts in DIAGONALS.items())
+
+    def effective_key(self) -> str | None:
+        """The key whose group should play: a diagonal that has a group wins (so W then A, or A then W, both give
+        W+A); otherwise the most recently pressed held key that has a group."""
+        for diag, (a, b) in DIAGONALS.items():
+            if a in self.held and b in self.held and self._group_for_key(diag) is not None:
+                return diag
+        return next((k for k in reversed(self.held) if self._group_for_key(k) is not None), None)
+
+    def lit(self) -> list[str]:
+        """Everything to light on the key pad: the keys held, plus a diagonal when both its keys are held."""
+        extra = [d for d, (a, b) in DIAGONALS.items() if a in self.held and b in self.held]
+        return list(self.held) + extra
+
+    def _switch(self) -> None:
+        now = self.effective_key()
+        if now is not None and now != self._current:
+            self._play(self._group_for_key(now), True)     # whatever was playing stops; the new group starts at its first frame
+        self._current = now
+
     def press(self, key: str) -> bool:
-        """An assigned key goes down. Returns False if it was ignored (not running, no group, auto-repeat)."""
-        g = self._group_for_key(key)
-        if not self.running or g is None or key in self.held:
+        """A key goes down. Returns False if it was ignored (not running, no group for it, auto-repeat)."""
+        if not self.running or not self._matters(key) or key in self.held:
             return False
         self.held.append(key)
-        self._play(g, True)                       # whatever was playing stops; the group starts from its first frame
+        self._switch()
         return True
 
     def release(self, key: str) -> bool:
         if not self.running or key not in self.held:
             return False
-        was_top = self.held[-1] == key
+        before = self._current
         self.held.remove(key)
-        g = self._group_for_key(key)
-        if self.held:
-            if was_top:                           # the most recently pressed key that is still held takes over
-                self._play(self._group_for_key(self.held[-1]), True)
-        elif g is not None:                       # no assigned key is held: the released group's resting state
-            self._apply(g.on_release, g.last)     # an ignored rule stops on the group's last frame
+        self._switch()
+        if self._current is None and before is not None:   # nothing playable is held: the released group's resting state
+            g = self._group_for_key(before)
+            self._apply(g.on_release, g.last)              # an ignored rule stops on the group's last frame
         return True
 
     def release_all(self) -> None:

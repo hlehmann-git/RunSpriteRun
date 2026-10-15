@@ -218,7 +218,8 @@ def test_clicking_a_timeline_frame_updates_every_view(win):
     assert win.panels["Frame view"].view._image is p.frames[5].image
     assert win.panels["Frame Group Preview"].view._image is p.frames[5].image
     assert win.panels["RunSpriteRun window"].view._image is p.frames[5].image
-    tl.slots[8].thumb.pressed.emit(8)
+    tl.bar.setValue(1)
+    tl.slots[7].thumb.pressed.emit(7)                          # frame 9 (the timeline shows 8 frames at a time)
     assert panel(win).blank
     assert win.panels["RunSpriteRun window"].view._image is p.frames[8].image
 
@@ -254,3 +255,11 @@ def test_preview_arrows_step_within_the_group_and_wrap(win):
     assert prev.timer.isActive() and prev.play_btn.isChecked()
     prev.fwd_btn.click()
     assert not prev.timer.isActive() and not prev.play_btn.isChecked()   # an arrow pauses playback
+
+
+def test_key_list_has_the_four_diagonals_with_clear_names(win):
+    p = panel(win)
+    names = [p.key.itemText(i) for i in range(p.key.count())]
+    assert "W+A (up-left)" in names and "W+D (up-right)" in names and "S+D (down-right)" in names and "S+A (down-left)" in names
+    p.key.setCurrentIndex(p.key.findData("W+D"))
+    assert p.key.currentData() == "W+D" and p.key.currentText() == "W+D (up-right)"

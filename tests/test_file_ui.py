@@ -239,9 +239,9 @@ def test_settings_ok_saves_and_applies(win, tmp_path, monkeypatch):
     c = win.controller
     view = win.panels["Frame view"].view
     assert view.grid is True
-    c.apply_settings(settings_io.Settings(False, 7, "groups"))
+    c.apply_settings(settings_io.Settings(False, "groups"))
     assert view.grid is False
-    assert settings_io.load().gap == 7
+    assert settings_io.load().export_mode == "groups"
     c.set_fps(24)
     assert c.project.fps == 24 and c.can_undo
     c.undo()
@@ -256,7 +256,7 @@ def test_settings_file_missing_or_damaged(tmp_path):
     part = tmp_path / "part.json"
     part.write_text(json.dumps({"gap": 99, "grid": False, "export_mode": "x"}))
     s = settings_io.load(part)
-    assert s.gap == 4 and s.grid is False and s.export_mode == "sheet"
+    assert s.grid is False and s.export_mode == "sheet"
 
 
 def test_help_about_menu_actions_need_project(app):

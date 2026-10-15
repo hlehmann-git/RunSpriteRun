@@ -14,7 +14,7 @@ from PIL import Image
 from src.core.colour import snap_colour, snap_lut
 from src.core.layers import colours_of, flatten
 from src.core.project import Frame, Group, Project, Rule
-from src.core.rules import DEFAULT_GAP, FPS_CHOICES, GAP_MAX, GAP_MIN, MAX_FRAMES, MAX_SIZE, MIN_SIZE, valid_label, valid_project_name
+from src.core.rules import FPS_CHOICES, MAX_FRAMES, MAX_SIZE, MIN_SIZE, valid_label, valid_project_name
 from src.core.systems import get_system
 
 FORMAT_VERSION = 1
@@ -63,7 +63,6 @@ def save_project(project: Project, path: str | Path) -> None:
         "height": project.height,
         "fps": project.fps,
         "transparent": list(project.transparent),
-        "gap": project.gap,
         "written_files": list(project.written_files),
         "extra_colours": [list(c) for c in project.extra_colours],
         "frames": [_frame_json(i, f) for i, f in enumerate(project.frames)],
@@ -172,9 +171,7 @@ def open_project(path: str | Path) -> Project:
             if len(used | {transparent} | set(extra)) > system.max_colours:
                 raise ProjectFileError("The frames use more colours than the system allows.")
 
-            gap = meta.get("gap", DEFAULT_GAP)
-            if not isinstance(gap, int) or isinstance(gap, bool) or not GAP_MIN <= gap <= GAP_MAX:
-                raise ProjectFileError("The sprite sheet gap in the file is not valid.")
+            # (older files may hold a sprite sheet gap: it is ignored, sheets no longer have one)
             from src.io.export import clean_written_list
             written = clean_written_list(meta.get("written_files", []))
 
@@ -187,7 +184,7 @@ def open_project(path: str | Path) -> Project:
                     raise ProjectFileError("A frame group in the file is outside the frames.")
 
             return Project(name=name, system=system, width=w, height=h, fps=fps,
-                           transparent=transparent, gap=gap, written_files=written, frames=frames, groups=groups,
+                           transparent=transparent, written_files=written, frames=frames, groups=groups,
                            extra_colours=extra, start_state=_rule_from_json(meta.get("start_state")), file_path=str(path), dirty=False)
     except ProjectFileError:
         raise

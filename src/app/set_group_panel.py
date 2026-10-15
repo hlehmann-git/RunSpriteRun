@@ -5,6 +5,7 @@ from PySide6.QtCore import Signal
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QColorDialog, QComboBox, QFrame, QLabel, QLineEdit, QPushButton, QSpinBox, QWidget
 
+from src.app.theme import short_popup
 from src.app import messages
 from src.app.controller import Controller
 from src.app.panel import Panel
@@ -12,7 +13,7 @@ from src.app.rule_editor import RuleEditor
 from src.app.sprite_view import SpriteView
 from src.core import edit, groups
 from src.core.project import Rule
-from src.core.rules import GROUP_NAME_MAX, KEYS, MAX_GROUPS
+from src.core.rules import GROUP_NAME_MAX, KEY_LABELS, KEYS, MAX_GROUPS
 
 NEW_GROUP = "New group"
 GREY = "color: #9aa0ae;"
@@ -35,6 +36,7 @@ class SetFrameGroupPanel(Panel):
         # Layout (v2): header row, then two columns separated by a thin line.
         #   left: GROUP (name, colour) and FRAMES (from / to with thumbnails); right: ON HOLD KEY and ON RELEASE
         self.chooser = QComboBox(self)
+        short_popup(self.chooser)
         self.chooser.setGeometry(161, 9, 150, 26)
         self._line(17, 41, 508, 1)
         self._line(285, 53, 1, 138)
@@ -67,9 +69,11 @@ class SetFrameGroupPanel(Panel):
 
         self._heading("ON HOLD KEY", 299, 50)
         self.key = QComboBox(self)
-        self.key.addItems(list(KEYS) + ["None"])
-        self.key.setGeometry(299, 64, 76, 26)
-        self.will_loop = self._row_label("Will loop", 387, 64, 80)
+        for k in KEYS:
+            self.key.addItem(KEY_LABELS.get(k, k), k)     # shown as "W+A (up-left)", kept as "W+A"
+        self.key.addItem("None", None)
+        self.key.setGeometry(299, 64, 126, 26)
+        self.will_loop = self._row_label("Will loop", 437, 64, 80)
         self.will_loop.setStyleSheet(GREY)
         self.release_label = self._heading("ON RELEASE", 299, 99)
         self.release = RuleEditor(self)
@@ -187,7 +191,7 @@ class SetFrameGroupPanel(Panel):
             b.setValue(v)
             b.blockSignals(False)
         self.key.blockSignals(True)
-        self.key.setCurrentText(g.key if g and g.key else "None")
+        self.key.setCurrentIndex(self.key.findData(g.key if g and g.key else None))
         self.key.blockSignals(False)
         self._set_colour(QColor(*(g.colour if g else (0, 0, 0))))
         default = Rule("frame", p.frames[0].label)                  # a new group starts at Go To Frame 1
@@ -205,7 +209,7 @@ class SetFrameGroupPanel(Panel):
         self.colour_hint.setVisible(not blank)
         self.from_view.setVisible(not blank)
         self.to_view.setVisible(not blank)
-        self.will_loop.setVisible(not blank and self.key.currentText() != "None")
+        self.will_loop.setVisible(not blank and self.key.currentData() is not None)
         for b in (self.from_box, self.to_box):
             b.blockSignals(True)
             b.setSpecialValueText(" " if blank else "")
@@ -216,7 +220,7 @@ class SetFrameGroupPanel(Panel):
         if blank:
             self.name.setText("")
             self.key.blockSignals(True)
-            self.key.setCurrentText("None")
+            self.key.setCurrentIndex(self.key.findData(None))
             self.key.blockSignals(False)
             self._set_colour(QColor(0, 0, 0))
             self.colour_btn.setStyleSheet("background: #1e1f24; border: 1px solid #3a3d47; border-radius: 4px;")
@@ -229,7 +233,7 @@ class SetFrameGroupPanel(Panel):
             view.set_sprite(p.frames[min(box.value(), len(p.frames)) - 1].image, p.transparent)
 
     def _key_changed(self) -> None:
-        self.will_loop.setVisible(self.key.currentText() != "None")
+        self.will_loop.setVisible(self.key.currentData() is not None)
 
     def _set_colour(self, c: QColor) -> None:
         self._colour = c
@@ -241,7 +245,7 @@ class SetFrameGroupPanel(Panel):
             self._set_colour(c)
 
     def _copy_into_new_group(self) -> bool:
-        key = None if self.key.currentText() == "None" else self.key.currentText()
+        key = self.key.currentData()
         c = self._colour
         return self.controller.copy_into_new_group(self.name.text(), self.from_box.value() - 1,
                                                    self.to_box.value() - 1, key, self.release.rule(),
@@ -254,7 +258,7 @@ class SetFrameGroupPanel(Panel):
             return False
         name = self.name.text()
         first, last = self.from_box.value() - 1, self.to_box.value() - 1
-        key = None if self.key.currentText() == "None" else self.key.currentText()
+        key = self.key.currentData()
         parent = self.controller.parent_widget
         try:
             before = self.controller.checkpoint()
