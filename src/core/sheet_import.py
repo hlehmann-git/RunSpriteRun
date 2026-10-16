@@ -137,7 +137,6 @@ def import_sheet(im: Image.Image, stem: str, grid: SheetGrid, fill: Colour, syst
                 if adj != orig:
                     details.append((orig, adj))
             res.adjustments.append(Adjustment(name, len(details), details))
-        label = default_label(f"{stem}_{n:03d}", labels)
-        labels.add(label)
+        label = default_label(stem)
         res.frames.append(ImportedFrame(label, snapped))
     return res

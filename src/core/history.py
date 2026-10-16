@@ -30,13 +30,13 @@ class Snapshot:
 
 
 def take(project: Project) -> Snapshot:
-    return Snapshot([(f.label, f.image, f.copied, f.layers) for f in project.frames], copy.deepcopy(project.groups),
+    return Snapshot([(f.label, f.image, f.copied, f.layers, f.uid) for f in project.frames], copy.deepcopy(project.groups),
                     copy.deepcopy(project.start_state), project.fps, project.transparent,
                     tuple(project.extra_colours))
 
 
 def restore(project: Project, snap: Snapshot) -> None:
-    project.frames[:] = [Frame(label, image, copied, layers) for label, image, copied, layers in snap.frames]   # the count can change
+    project.frames[:] = [Frame(label, image, copied, layers, uid) for label, image, copied, layers, uid in snap.frames]   # the count can change
     project.groups[:] = copy.deepcopy(snap.groups)
     project.start_state = copy.deepcopy(snap.start_state)
     project.fps = snap.fps

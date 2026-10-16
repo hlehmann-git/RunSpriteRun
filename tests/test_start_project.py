@@ -166,7 +166,7 @@ def test_blank_project_options_and_creation(app, tmp_path, monkeypatch):
     d._create()
     p = d.project
     assert (p.name, p.width, p.height, p.fps, len(p.frames)) == ("Fresh", 32, 48, 24, 5)
-    assert p.frames[0].image.size == (32, 48) and p.frames[4].label == "Frame_5"
+    assert p.frames[0].image.size == (32, 48) and p.frames[4].label == "Frame_005"
     assert p.frames[0].image.getpixel((0, 0)) == p.transparent
 
 

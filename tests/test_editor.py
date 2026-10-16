@@ -239,11 +239,11 @@ def test_new_frame_is_blank_gets_a_label_and_is_inserted_where_asked(fresh):
     c.select(1)
     assert e.begin(new=True, where="after")
     p = c.project
-    assert [f.label for f in p.frames][2] == "Frame_5" and c.selected == 2 and len(p.frames) == 5
+    assert [f.label for f in p.frames][2] == "Frame_003" and c.selected == 2 and len(p.frames) == 5
     assert p.frames[2].image.getcolors() == [(64, T)]
     e.finish(False)
     assert len(p.frames) == 4 and c.selected == 1                      # discarding leaves no trace
-    assert e.begin(new=True, where="first") and c.project.frames[0].label == "Frame_5" and c.selected == 0
+    assert e.begin(new=True, where="first") and c.project.frames[0].label == "Frame_001" and c.selected == 0
     e.finish(True)
     assert len(c.project.frames) == 5 and c.can_undo and c.undo() and len(c.project.frames) == 4
 
@@ -267,9 +267,9 @@ def named_project(labels):
 def grouped(app):
     from src.core.project import Group, Rule
     w = MainWindow()
-    p = named_project(["Idle_1", "Idle_2", "Idle_3", "Idle_4", "Jump_1", "Jump_2"])
-    p.groups = [Group("Idle", 0, 3, on_release=Rule("frame", "Idle_4")), Group("Jump", 4, 5)]
-    p.start_state = Rule("frame", "Idle_3")
+    p = named_project(["Idle_001", "Idle_002", "Idle_003", "Idle_004", "Jump_005", "Jump_006"])
+    p.groups = [Group("Idle", 0, 3, on_release=Rule("frame", "Idle_004")), Group("Jump", 4, 5)]
+    p.start_state = Rule("frame", "Idle_003")
     w.set_project(p)
     return w
 
@@ -278,20 +278,20 @@ def labels(w):
     return [f.label for f in w.controller.project.frames]
 
 
-def test_new_frame_in_a_group_takes_its_label_and_renumbers_the_rest(grouped):
+def test_new_frame_in_a_group_is_named_frame_and_the_rest_renumber(grouped):
     c, e = grouped.controller, grouped.controller.edit
     p = c.project
     c.select(2)
     assert e.begin(new=True, where="after")
-    assert labels(grouped) == ["Idle_1", "Idle_2", "Idle_3", "Idle_4", "Idle_5", "Jump_1", "Jump_2"]
+    assert labels(grouped) == ["Idle_001", "Idle_002", "Idle_003", "Frame_004", "Idle_005", "Jump_006", "Jump_007"]
     assert [(g.first, g.last) for g in p.groups] == [(0, 4), (5, 6)]
-    assert p.groups[0].on_release.target == "Idle_5" and p.start_state.target == "Idle_3"     # rules follow the renamed frames
+    assert p.groups[0].on_release.target == "Idle_005" and p.start_state.target == "Idle_003"     # rules follow the renumbered frames
     e.finish(False)                                                       # discarding puts every label back
-    assert labels(grouped)[:5] == ["Idle_1", "Idle_2", "Idle_3", "Idle_4", "Jump_1"] and p.groups[0].on_release.target == "Idle_4"
+    assert labels(grouped)[:5] == ["Idle_001", "Idle_002", "Idle_003", "Idle_004", "Jump_005"] and p.groups[0].on_release.target == "Idle_004"
     c.select(2)
     e.begin(new=True, where="after")
     e.finish(True)
-    assert c.undo() and labels(grouped)[3] == "Idle_4" and len(p.frames) == 6    # one Undo step brings everything back
+    assert c.undo() and labels(grouped)[3] == "Idle_004" and len(p.frames) == 6    # one Undo step brings everything back
 
 
 def test_inserting_at_either_end_of_a_group_extends_it(grouped):
@@ -299,56 +299,44 @@ def test_inserting_at_either_end_of_a_group_extends_it(grouped):
     p = c.project
     c.select(3)
     e.begin(new=True, where="after")                                      # after the last Idle frame
-    assert labels(grouped)[3:6] == ["Idle_4", "Idle_5", "Jump_1"] and (p.groups[0].first, p.groups[0].last) == (0, 4)
+    assert labels(grouped)[3:6] == ["Idle_004", "Frame_005", "Jump_006"] and (p.groups[0].first, p.groups[0].last) == (0, 4)
     e.finish(False)
     c.select(4)
     e.begin(new=True, where="before")                                     # before the first Jump frame
-    assert labels(grouped)[4:7] == ["Jump_1", "Jump_2", "Jump_3"] and (p.groups[1].first, p.groups[1].last) == (4, 6)
+    assert labels(grouped)[4:7] == ["Frame_005", "Jump_006", "Jump_007"] and (p.groups[1].first, p.groups[1].last) == (4, 6)
     e.finish(False)
     c.select(4)
     e.begin(new=True, where="first")                                      # Frame 1 stays outside unless Frame 1 is selected
-    assert p.frames[0].label == "Frame_7" and (p.groups[0].first, p.groups[0].last) == (1, 4)
+    assert p.frames[0].label == "Frame_001" and (p.groups[0].first, p.groups[0].last) == (1, 4)
     e.finish(False)
     c.select(0)
     e.begin(new=True, where="first")
-    assert p.frames[0].label == "Idle_1" and (p.groups[0].first, p.groups[0].last) == (0, 4)
+    assert p.frames[0].label == "Frame_001" and (p.groups[0].first, p.groups[0].last) == (0, 4)
     e.finish(False)
 
 
-def test_renumbering_only_goes_as_far_as_needed_and_keeps_zero_padding(app):
+def test_frames_after_a_new_frame_are_renumbered_and_keep_their_names(app):
     from src.core.project import Group
     w = MainWindow()
-    p = named_project(["Run_1", "Run_2", "Run_4", "Other"])
+    p = named_project(["Run_001", "Run_002", "Run_003", "Other_004"])
     p.groups = [Group("Run", 0, 2)]
     w.set_project(p)
     w.controller.select(1)
     w.controller.edit.begin(new=True, where="after")
-    assert labels(w) == ["Run_1", "Run_2", "Run_3", "Run_4", "Other"]      # Run_4 had room: nothing renamed
+    assert labels(w) == ["Run_001", "Run_002", "Frame_003", "Run_004", "Other_005"]
     w.controller.edit.finish(False)
-    p2 = named_project(["Hit_01", "Hit_02", "Hit_03"])
-    p2.groups = [Group("Hit", 0, 2)]
-    w.set_project(p2)
-    w.controller.select(0)
-    w.controller.edit.begin(new=True, where="after")
-    assert labels(w) == ["Hit_01", "Hit_02", "Hit_03", "Hit_04"]
+    assert labels(w) == ["Run_001", "Run_002", "Run_003", "Other_004"]
 
 
-def test_mixed_labels_or_clashes_fall_back_to_a_frame_label(app):
+def test_group_with_mixed_names_still_gets_a_frame_named_frame(app):
     from src.core.project import Group
     w = MainWindow()
-    p = named_project(["Idle_1", "Wobble", "Idle_2", "Jump_1"])
+    p = named_project(["Idle_001", "Wobble_002", "Idle_003", "Jump_004"])
     p.groups = [Group("Idle", 0, 2)]
     w.set_project(p)
     w.controller.select(0)
     w.controller.edit.begin(new=True, where="after")
-    assert labels(w)[1] == "Frame_5" and p.groups[0].last == 3
-    w.controller.edit.finish(False)
-    p2 = named_project(["Idle_1", "Idle_2", "Idle_3"])
-    p2.groups = [Group("Idle", 0, 1)]
-    w.set_project(p2)
-    w.controller.select(0)
-    w.controller.edit.begin(new=True, where="after")
-    assert labels(w)[1] == "Frame_4"                                       # Idle_3 is taken by a frame outside the group
+    assert labels(w) == ["Idle_001", "Frame_002", "Wobble_003", "Idle_004", "Jump_005"] and p.groups[0].last == 3
 
 
 def test_frame_limit_stops_a_new_frame(fresh):

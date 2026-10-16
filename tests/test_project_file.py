@@ -30,7 +30,7 @@ def test_roundtrip(project, tmp_path):
     back = open_project(f)
     assert (back.name, back.system.name, back.width, back.height, back.fps) == ("Demo", GENESIS.name, 8, 8, 24)
     assert back.transparent == project.transparent
-    assert [x.label for x in back.frames] == ["a", "b"]
+    assert [x.label for x in back.frames] == ["a_001", "b_002"]       # numbered by position on opening
     assert all(x.image.tobytes() == y.image.tobytes() for x, y in zip(back.frames, project.frames))
     assert back.groups == project.groups and back.start_state == project.start_state
 
@@ -107,3 +107,24 @@ def test_failed_save_leaves_old_file(project, tmp_path):
     with pytest.raises(Exception):
         save_project(project, f)
     assert f.read_bytes() == before and [p.name for p in tmp_path.iterdir() if p.suffix == ".tmp"] == []
+
+
+def test_old_file_labels_are_converted(project, tmp_path):
+    f, g = tmp_path / "Demo.rsr", tmp_path / "Old.rsr"
+    save_project(project, f)
+
+    def drop_flag(n, d):
+        if n != "project.json":
+            return d
+        meta = json.loads(d)
+        meta.pop("labels", None)
+        meta["frames"][0]["label"] = "Idle_4"
+        meta["frames"][1]["label"] = "Run"
+        meta["start_state"] = {"kind": "frame", "target": "Idle_4", "loop": False}
+        return json.dumps(meta)
+    _rewrite(f, g, drop_flag)
+    back = open_project(g)
+    assert [x.label for x in back.frames] == ["Idle_001", "Run_002"] and back.start_state.target == "Idle_001"
+    assert not back.dirty
+    save_project(back, f)
+    assert [x.label for x in open_project(f).frames] == ["Idle_001", "Run_002"]

@@ -34,7 +34,7 @@ def make():
     f1 = Image.new("RGB", (8, 8), a)
     f1.putpixel((2, 3), b)
     f2 = Image.new("RGB", (8, 8), b)
-    return Project("P", get_system("Atari ST"), 8, 8, frames=[Frame("f1", f1), Frame("f2", f2)],
+    return Project("P", get_system("Atari ST"), 8, 8, frames=[Frame("f1_001", f1), Frame("f2_002", f2)],
                    groups=[Group("G", 0, 1)], dirty=False)
 
 
@@ -160,15 +160,17 @@ def test_undo_redo_palette_and_menu(win):
 def test_undo_covers_label_move_group_and_clears_on_new_project(win):
     c = win.controller
     p = c.project
-    c.rename(0, "walk")
+    c.rename(0, "walk")                                   # frame 1 is in group G: the whole group is renamed
+    assert [f.label for f in p.frames] == ["walk_001", "walk_002"]
+    first = p.frames[0].uid
     c.move_frame(0, 1)
-    assert [f.label for f in p.frames] == ["f2", "walk"]
+    assert p.frames[1].uid == first and [f.label for f in p.frames] == ["walk_001", "walk_002"]
     c.undo()
-    assert [f.label for f in p.frames] == ["walk", "f2"]
+    assert p.frames[0].uid == first
     c.undo()
-    assert p.frames[0].label == "f1"
+    assert [f.label for f in p.frames] == ["f1_001", "f2_002"]
     c.redo()
-    assert p.frames[0].label == "walk"
+    assert p.frames[0].label == "walk_001"
     c.delete_group("G")
     assert p.groups == []
     c.undo()

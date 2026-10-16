@@ -356,9 +356,6 @@ class MainWindow(QMainWindow):
             return False                                 # the project stays open and unsaved
         self.controller.clear_history()                  # saving clears undo (FR-2.2)
         self._update_save_action()
-        if any(f.copied for f in p.frames):              # reminder only: the file is saved (FR-3.2)
-            messages.info(self, "Correct duplicate frame labels.",
-                          "Frames with a red label are copies and still need their own label.")
         return True
 
     def closeEvent(self, event) -> None:

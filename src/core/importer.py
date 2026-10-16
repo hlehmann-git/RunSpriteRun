@@ -152,8 +152,7 @@ def import_files(paths: list[Path], system: System, width: int, height: int) -> 
             continue
 
         colours |= file_colours
-        label = default_label(path.stem, labels)
-        labels.add(label)
+        label = default_label(path.stem)
         res.frames.append(ImportedFrame(label, snapped))
 
     return res

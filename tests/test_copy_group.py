@@ -10,7 +10,6 @@ from src.app import messages
 from src.app.main_window import MainWindow
 from src.core import edit, groups
 from src.core.project import Frame, Group, Project, Rule
-from src.core.rules import copy_label
 from src.core.systems import get_system
 from src.io.project_file import open_project, save_project
 
@@ -31,7 +30,7 @@ def log(monkeypatch):
 
 
 def make_project(n=12):
-    frames = [Frame(f"f{i + 1}", Image.new("RGB", (8, 8), (17 * (i % 3), 0, 0))) for i in range(n)]
+    frames = [Frame(f"f{i + 1}_{i + 1:03d}", Image.new("RGB", (8, 8), (17 * (i % 3), 0, 0))) for i in range(n)]
     return Project("P", get_system("Amiga"), 8, 8, frames=frames,
                    groups=[Group("Idle", 0, 3, key="S"), Group("Right", 4, 7, key="D")], dirty=False)
 
@@ -51,22 +50,15 @@ def fill(p, name, first, last, key="None"):
     p.key.setCurrentText(key)
 
 
-def test_copy_label_suffix_counts_up():
-    assert copy_label("Idle_1", {"Idle_1"}) == "Idle_1_001"
-    assert copy_label("Idle_1", {"Idle_1", "Idle_1_001"}) == "Idle_1_002"
-    long = "a" * 40
-    assert len(copy_label(long, {long})) == 40 and copy_label(long, {long}).endswith("_001")
-
-
 def test_core_copy_appends_frames_and_group():
     p = make_project()
-    g = edit.copy_into_new_group(p, "Copy", 1, 2, "W", Rule("frame", "f1"), (9, 9, 9))
-    assert [f.label for f in p.frames[12:]] == ["f2_001", "f3_001"] and all(f.copied for f in p.frames[12:])
-    assert not any(f.copied for f in p.frames[:12])
+    g = edit.copy_into_new_group(p, "Copy", 1, 2, "W", Rule("frame", "f1_001"), (9, 9, 9))
+    assert [f.label for f in p.frames[12:]] == ["Copy_013", "Copy_014"]        # named after the new group, numbered by position
+    assert not any(f.copied for f in p.frames)                                  # no red marking any more
     assert (g.first, g.last, g.key) == (12, 13, "W")
     assert p.frames[12].image is p.frames[1].image or p.frames[12].image.tobytes() == p.frames[1].image.tobytes()
     edit.copy_into_new_group(p, "Again", 1, 1, None, None, (0, 0, 0))
-    assert p.frames[14].label == "f2_002"
+    assert p.frames[14].label == "Again_015" and p.frames[0].label == "f1_001"
 
 
 def test_core_copy_limits():
@@ -78,15 +70,13 @@ def test_core_copy_limits():
     assert len(p.frames) == 120
 
 
-def test_rename_clears_red_and_checks_duplicates():
+def test_renaming_a_copied_frame_renames_its_group():
     p = make_project()
-    edit.copy_into_new_group(p, "Copy", 0, 0, None, None, (0, 0, 0))
-    assert p.frames[12].copied
-    with pytest.raises(edit.EditError):
-        edit.rename_label(p, 12, "f1")
-    assert p.frames[12].copied                                     # refused: still red
+    edit.copy_into_new_group(p, "Copy", 0, 1, None, None, (0, 0, 0))
     edit.rename_label(p, 12, "walk")
-    assert not p.frames[12].copied
+    assert [f.label for f in p.frames[12:]] == ["walk_013", "walk_014"]
+    edit.rename_label(p, 12, "f1")                                 # a name another frame already has is fine
+    assert [f.label for f in p.frames[12:]] == ["f1_013", "f1_014"] and p.frames[0].label == "f1_001"
 
 
 def test_overlap_message_copy_button_makes_new_group(win, log):
@@ -98,17 +88,16 @@ def test_overlap_message_copy_button_makes_new_group(win, log):
     p = c.project
     assert "already belong" in log["warn"][0]
     assert len(p.frames) == 16 and p.groups[-1].name == "Dup" and (p.groups[-1].first, p.groups[-1].last) == (12, 15)
-    assert [f.label for f in p.frames[12:]] == ["f2_001", "f3_001", "f4_001", "f5_001"]
+    assert [f.label for f in p.frames[12:]] == ["Dup_013", "Dup_014", "Dup_015", "Dup_016"]
     assert c.selected == 12 and panel.current == "Dup"
     assert win.info_bar.label.text().endswith("Frames: 16   |   Frame Groups: 3")
     tl = win.panels["Timeline and frames"]
     slot = next(sl for sl in tl.slots if sl.number.text() == "13")      # the first copied frame
-    assert slot.label.text() == "f2_001"
-    assert "#c0392b" in slot.label.styleSheet() and "#ffffff" in slot.label.styleSheet()
+    assert slot.label.text() == "Dup" and slot.suffix.text() == "_013"          # name to edit, number fixed
     c.undo()
     assert len(p.frames) == 12 and len(p.groups) == 2
     c.redo()
-    assert len(p.frames) == 16 and p.frames[12].copied
+    assert len(p.frames) == 16 and p.frames[12].label == "Dup_013"
 
 
 def test_overlap_message_ok_does_nothing(win, log):
@@ -164,9 +153,10 @@ def test_edit_group_overlap_has_no_copy_button(win, log):
     assert len(win.controller.project.frames) == 12
 
 
-def test_red_labels_persist_in_rsr(tmp_path):
+def test_copied_group_labels_persist_in_rsr(tmp_path):
     p = make_project()
     edit.copy_into_new_group(p, "Copy", 0, 1, None, None, (0, 0, 0))
     save_project(p, tmp_path / "P.rsr")
     q = open_project(tmp_path / "P.rsr")
-    assert [f.copied for f in q.frames[10:]] == [False, False, True, True]
+    assert [f.label for f in q.frames[10:]] == ["f11_011", "f12_012", "Copy_013", "Copy_014"]
+    assert not any(f.copied for f in q.frames)

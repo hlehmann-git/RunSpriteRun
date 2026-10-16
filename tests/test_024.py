@@ -24,7 +24,7 @@ def test_esc_keeps_typed_label_and_ends_editing(win):
     s.label.setText("Hero_1")
     QTest.keyClick(s.label, Qt.Key_Escape)
     assert QApplication.focusWidget() is not s.label
-    assert win.controller.project.frames[0].label == "Hero_1"
+    assert win.controller.project.frames[0].label == "Hero_1_001"
 
 
 def test_click_outside_keeps_typed_label_and_ends_editing(win):
@@ -34,7 +34,7 @@ def test_click_outside_keeps_typed_label_and_ends_editing(win):
     s.label.setText("Hero_2")
     QTest.mouseClick(win.panels["Palette panel"], Qt.LeftButton)
     assert QApplication.focusWidget() is not s.label
-    assert win.controller.project.frames[1].label == "Hero_2"
+    assert win.controller.project.frames[1].label == "Hero_2_002"
 
 
 def test_click_inside_the_label_keeps_editing(win):

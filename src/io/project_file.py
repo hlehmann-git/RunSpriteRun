@@ -70,6 +70,7 @@ def save_project(project: Project, path: str | Path) -> None:
                     "on_release": _rule_to_json(g.on_release), "colour": list(g.colour)}
                    for g in project.groups],
         "start_state": _rule_to_json(project.start_state),
+        "labels": "numbered",          # labels are name_NNN (NNN = position); files without this are converted on opening
     }
     fd, tmp = tempfile.mkstemp(suffix=".tmp", dir=path.parent)
     os.close(fd)
@@ -160,7 +161,7 @@ def open_project(path: str | Path) -> Project:
                     for im in layers:
                         used |= colours_of(im)
                 used |= colours_of(img)
-                frames.append(Frame(label, img, copied=bool(e.get("copied", False)), layers=layers))
+                frames.append(Frame(label, img, layers=layers))
 
             extra = []
             for c in meta.get("extra_colours", []):
@@ -183,9 +184,16 @@ def open_project(path: str | Path) -> Project:
                 if not (0 <= g.first <= g.last < len(frames)):
                     raise ProjectFileError("A frame group in the file is outside the frames.")
 
-            return Project(name=name, system=system, width=w, height=h, fps=fps,
-                           transparent=transparent, written_files=written, frames=frames, groups=groups,
-                           extra_colours=extra, start_state=_rule_from_json(meta.get("start_state")), file_path=str(path), dirty=False)
+            project = Project(name=name, system=system, width=w, height=h, fps=fps,
+                              transparent=transparent, written_files=written, frames=frames, groups=groups,
+                              extra_colours=extra, start_state=_rule_from_json(meta.get("start_state")), file_path=str(path), dirty=False)
+            from src.core import edit
+            if meta.get("labels") == "numbered":
+                edit.renumber(project)
+            else:
+                edit.convert_old_labels(project)               # an older project: converted without a message
+            project.dirty = False
+            return project
     except ProjectFileError:
         raise
     except (OSError, zipfile.BadZipFile, json.JSONDecodeError, KeyError, TypeError, ValueError, SyntaxError):

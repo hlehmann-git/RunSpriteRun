@@ -20,7 +20,7 @@ def app():
 
 
 def project(n=12, system="Atari ST", groups=()):
-    frames = [Frame(f"f{i + 1}", Image.new("RGB", (8, 8), (73 * (i % 3), 0, 0))) for i in range(n)]
+    frames = [Frame(f"f{i + 1}_{i + 1:03d}", Image.new("RGB", (8, 8), (73 * (i % 3), 0, 0))) for i in range(n)]
     return Project("P", get_system(system), 8, 8, transparent=(0, 0, 0), frames=frames, groups=list(groups), dirty=False)
 
 
@@ -47,7 +47,7 @@ def test_timeline_shows_eight_and_scrolls(win):
     assert sum(s.isVisibleTo(t) for s in t.slots) == VISIBLE
     assert t.slots[0].number.text() == "1" and t.bar.maximum() == 4
     t.scroll_by(1)
-    assert t.slots[0].number.text() == "2" and t.slots[0].label.text() == "f2"
+    assert t.slots[0].number.text() == "2" and t.slots[0].label.text() == "f2" and t.slots[0].suffix.text() == "_002"
     t.bar.setValue(4)
     assert t.slots[7].number.text() == "12" and not t.right.isEnabled()
     t.left.click()
@@ -59,7 +59,7 @@ def test_selection_follows_and_scrolls_into_view(win):
     win.controller.select(11)
     assert t.first == 4 and win.panels["Frame view"].number.currentText() == "12"
     win.controller.select(0)
-    assert t.first == 0 and win.panels["Frame view"].label.currentText() == "f1"
+    assert t.first == 0 and win.panels["Frame view"].label.currentText() == "f1_001"
     t.slots[4].thumb.pressed.emit(4)
     assert win.controller.selected == 4
 
@@ -82,20 +82,33 @@ def test_rename_valid_and_refused(win):
     s = t.slots[3]
     s.label.setText("Jump_1")
     s.label.editingFinished.emit()
-    assert win.controller.project.frames[3].label == "Jump_1"
+    assert win.controller.project.frames[3].label == "Jump_1_004" and s.suffix.text() == "_004"
     s.label.setText("bad name")
     s.label.editingFinished.emit()
-    assert shown[-1].startswith("Labels can only use") and s.label.text() == "Jump_1"
-    s.label.setText("F1")
+    assert shown[-1].startswith("Names can only use") and s.label.text() == "Jump_1"
+    s.label.setText("")
     s.label.editingFinished.emit()
-    assert shown[-1] == "Frame labels must be unique." and s.label.text() == "Jump_1"
+    assert shown[-1] == "A frame needs a name." and s.label.text() == "Jump_1"       # the old name returns
+    s.label.setText("f1")                                                           # a name another frame has is fine
+    s.label.editingFinished.emit()
+    assert win.controller.project.frames[3].label == "f1_004"
+
+
+def test_renaming_in_a_group_renames_the_group(win):
+    t = tl(win)
+    t.slots[1].label.setText("Idle")
+    t.slots[1].label.editingFinished.emit()                  # frames 1 and 2 are group A
+    assert [f.label for f in win.controller.project.frames][:3] == ["Idle_001", "Idle_002", "f3_003"]
+    assert t.slots[0].label.text() == "Idle"
+    win.controller.undo()
+    assert [f.label for f in win.controller.project.frames][:3] == ["f1_001", "f2_002", "f3_003"]
 
 
 def test_ctrl_move_and_keep_selection(win):
     win.controller.select(4)
     assert win.controller.move_selected(1)
     labels = [f.label for f in win.controller.project.frames]
-    assert labels[4:6] == ["f6", "f5"] and win.controller.selected == 5
+    assert labels[4:6] == ["f6_005", "f5_006"] and win.controller.selected == 5
 
 
 def test_drag_reorder_and_cancel(win):
@@ -105,13 +118,13 @@ def test_drag_reorder_and_cancel(win):
     t._drag_move(0, at(3))
     assert t.marker.isVisible()
     t._drag_end(0, at(3))                              # frame 1 dropped before frame 4
-    assert [f.label for f in win.controller.project.frames][:4] == ["f2", "f3", "f1", "f4"]
+    assert [f.label for f in win.controller.project.frames][:4] == ["f2_001", "f3_002", "f1_003", "f4_004"]
     t._drag_move(2, at(7))
     t._drag_end(2, QPoint(5, 5))                       # dropped outside the strip: nothing changes
-    assert [f.label for f in win.controller.project.frames][:4] == ["f2", "f3", "f1", "f4"]
+    assert [f.label for f in win.controller.project.frames][:4] == ["f2_001", "f3_002", "f1_003", "f4_004"]
     t._drag_move(2, at(7))
     t._cancel_drag()                                   # Esc
-    assert not t.marker.isVisible() and win.controller.project.frames[2].label == "f1"
+    assert not t.marker.isVisible() and win.controller.project.frames[2].label == "f1_003"
 
 
 def test_palette_panel_counts_and_free_slots(win):
@@ -161,11 +174,11 @@ def test_ctrl_c_ctrl_v_pastes_after_with_dialog_and_undo(win, monkeypatch):
     seen = _paste_dialog(monkeypatch)
     t.slots[2].thumb.pressed.emit(2)                      # click frame 3 (f3): the panel now has the focus
     _ctrl(t, Qt.Key_C)
-    assert c.frame_clipboard is not None and c.frame_clipboard.label == "f3"
-    t.slots[5].thumb.pressed.emit(5)                      # select f6
+    assert c.frame_clipboard is not None and c.frame_clipboard.label == "f3_003"
+    t.slots[5].thumb.pressed.emit(5)                      # select f6: Before / After still refer to the copied f3
     _ctrl(t, Qt.Key_V)
     labels = [f.label for f in c.project.frames]
-    assert seen == ["Paste frame"] and len(labels) == 13 and labels[6] == "f3_001" and c.selected == 6
+    assert seen == ["Paste frame"] and len(labels) == 13 and labels[2:4] == ["f3_003", "f3_004"] and labels[6] == "f6_007" and c.selected == 3
     assert c.history.can_undo
     c.undo()
     assert len(c.project.frames) == 12
@@ -182,7 +195,8 @@ def test_paste_before_and_cancel(win, monkeypatch):
     assert len(c.project.frames) == 12 and c.frame_clipboard is not None      # cancelled: nothing changes
     _paste_dialog(monkeypatch, after=False)
     _ctrl(t, Qt.Key_V)
-    assert c.project.frames[4].label == "f1_001" and c.selected == 4
+    assert c.project.frames[0].label == "f1_001" and c.project.frames[1].label == "f1_002" and c.selected == 0
+    assert (c.project.groups[0].first, c.project.groups[0].last) == (0, 2)      # the copy joined its own group A
 
 
 def test_paste_with_nothing_copied_does_nothing(win, monkeypatch):
@@ -214,10 +228,10 @@ def test_right_click_copy_before_and_after(win, monkeypatch):
     monkeypatch.setattr(TimelinePanel, "_exec_menu",
                         lambda self, menu, pos: next(a for a in menu.actions() if a.text() == pick["text"]))
     t.slots[2].thumb.menu_requested.emit(2, QPoint(0, 0))
-    assert [f.label for f in c.project.frames][2:4] == ["f3", "f3_001"] and c.selected == 3
+    assert [f.label for f in c.project.frames][2:4] == ["f3_003", "f3_004"] and c.selected == 3
     pick["text"] = "Copy before"
     t.slots[0].thumb.menu_requested.emit(0, QPoint(0, 0))
-    assert [f.label for f in c.project.frames][:2] == ["f1_001", "f1"] and c.selected == 0
+    assert [f.label for f in c.project.frames][:2] == ["f1_001", "f1_002"] and c.selected == 0
     assert c.frame_clipboard is None                      # the menu needs no Ctrl+C
 
 
@@ -231,97 +245,29 @@ def test_shortcuts_do_nothing_in_edit_mode(win, monkeypatch):
     assert not c.clone_frame(1, True) and len(c.project.frames) == 12
 
 
-# ---- Timeline copy / paste ----
-def _ctrl(widget, key):
-    from PySide6.QtCore import Qt
-    from PySide6.QtTest import QTest
-    widget.window().activateWindow()                     # shortcuts only fire in the active window
-    QApplication.processEvents()
-    QTest.keyClick(widget, key, Qt.ControlModifier)
-
-
-def _paste_dialog(monkeypatch, after=True, accept=True):
-    from src.app import timeline
-    seen = []
-
-    def fake_exec(self):
-        seen.append(self.windowTitle())
-        (self.after if after else self.before).setChecked(True)
-        return 1 if accept else 0
-    monkeypatch.setattr(timeline.PasteFrameDialog, "exec", fake_exec)
-    return seen
-
-
-def test_ctrl_c_ctrl_v_pastes_after_with_dialog_and_undo(win, monkeypatch):
+def test_paste_does_nothing_when_the_copied_frame_is_gone(win, monkeypatch):
     from PySide6.QtCore import Qt
     c, t = win.controller, tl(win)
     seen = _paste_dialog(monkeypatch)
-    t.slots[2].thumb.pressed.emit(2)                      # click frame 3 (f3): the panel now has the focus
-    _ctrl(t, Qt.Key_C)
-    assert c.frame_clipboard is not None and c.frame_clipboard.label == "f3"
-    t.slots[5].thumb.pressed.emit(5)                      # select f6
-    _ctrl(t, Qt.Key_V)
-    labels = [f.label for f in c.project.frames]
-    assert seen == ["Paste frame"] and len(labels) == 13 and labels[6] == "f3_001" and c.selected == 6
-    c.undo()
-    assert len(c.project.frames) == 12
-
-
-def test_paste_before_and_cancel(win, monkeypatch):
-    from PySide6.QtCore import Qt
-    c, t = win.controller, tl(win)
-    t.slots[0].thumb.pressed.emit(0)
-    _ctrl(t, Qt.Key_C)
     t.slots[4].thumb.pressed.emit(4)
-    _paste_dialog(monkeypatch, accept=False)
-    _ctrl(t, Qt.Key_V)
-    assert len(c.project.frames) == 12 and c.frame_clipboard is not None      # cancelled: nothing changes
-    _paste_dialog(monkeypatch, after=False)
-    _ctrl(t, Qt.Key_V)
-    assert c.project.frames[4].label == "f1_001" and c.selected == 4
-
-
-def test_paste_with_nothing_copied_does_nothing(win, monkeypatch):
-    from PySide6.QtCore import Qt
-    t = tl(win)
-    seen = _paste_dialog(monkeypatch)
-    t.slots[0].thumb.pressed.emit(0)
-    _ctrl(t, Qt.Key_V)
-    assert seen == [] and len(win.controller.project.frames) == 12 and not shown
-
-
-def test_clicking_out_of_the_timeline_drops_the_copy(win, monkeypatch):
-    from PySide6.QtCore import Qt
-    c, t = win.controller, tl(win)
-    t.slots[0].thumb.pressed.emit(0)
     _ctrl(t, Qt.Key_C)
-    assert c.frame_clipboard is not None
-    other = win.panels["Frame view"]
-    other.setFocusPolicy(Qt.StrongFocus)
-    other.setFocus()
-    QApplication.processEvents()
-    assert c.frame_clipboard is None
+    _ctrl(t, Qt.Key_V)                                    # a copy lands after frame 5 (index 5)
+    assert len(c.project.frames) == 13
+    t.slots[5].thumb.pressed.emit(5)
+    _ctrl(t, Qt.Key_C)                                    # copy the copy ...
+    c.undo()                                              # ... then Undo removes it
+    assert len(c.project.frames) == 12 and c.copied_index() is None
+    seen.clear()
+    _ctrl(t, Qt.Key_V)
+    assert seen == [] and len(c.project.frames) == 12 and not shown
 
 
-def test_right_click_copy_before_and_after(win, monkeypatch):
-    from src.app.timeline import TimelinePanel
-    c, t = win.controller, tl(win)
-    pick = {"text": "Copy after"}
-    monkeypatch.setattr(TimelinePanel, "_exec_menu",
-                        lambda self, menu, pos: next(a for a in menu.actions() if a.text() == pick["text"]))
-    t.slots[2].thumb.menu_requested.emit(2, QPoint(0, 0))
-    assert [f.label for f in c.project.frames][2:4] == ["f3", "f3_001"] and c.selected == 3
-    pick["text"] = "Copy before"
-    t.slots[0].thumb.menu_requested.emit(0, QPoint(0, 0))
-    assert [f.label for f in c.project.frames][:2] == ["f1_001", "f1"] and c.selected == 0
-    assert c.frame_clipboard is None                      # the menu needs no Ctrl+C
-
-
-def test_shortcuts_do_nothing_in_edit_mode(win, monkeypatch):
+def test_copied_frame_is_still_found_after_undo_and_moves(win, monkeypatch):
     from PySide6.QtCore import Qt
     c, t = win.controller, tl(win)
-    t.slots[1].thumb.pressed.emit(1)
-    c.edit.begin()
+    t.slots[4].thumb.pressed.emit(4)
     _ctrl(t, Qt.Key_C)
-    assert c.frame_clipboard is None
-    assert not c.clone_frame(1, True) and len(c.project.frames) == 12
+    c.move_frame(4, 0)                                    # the copied frame moves ...
+    assert c.copied_index() == 0
+    c.undo()                                              # ... and Undo brings it back as the same frame
+    assert c.copied_index() == 4

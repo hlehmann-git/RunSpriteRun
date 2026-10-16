@@ -110,21 +110,33 @@ class Controller(QObject):
         if self.project is None or not self.project.frames or self.edit.mode:
             return False
         f = self.project.frames[self.selected]
-        self.frame_clipboard = Frame(f.label, f.image, layers=f.layers)
+        self.frame_clipboard = Frame(f.label, f.image, layers=f.layers, uid=f.uid)
         return True
 
     def drop_frame_clipboard(self) -> None:
         self.frame_clipboard = None
 
-    def paste_frame(self, after: bool, src: Frame | None = None) -> bool:
-        """Insert a copy of `src` (default: the remembered frame) before or after the selected frame, as one Undo step."""
+    def copied_index(self, src: Frame | None = None) -> int | None:
+        """Where the copied frame is now, or None when there is nothing copied or the frame is gone."""
         src = src if src is not None else self.frame_clipboard
-        if self.project is None or src is None or self.edit.mode:
+        if self.project is None or src is None:
+            return None
+        for i, f in enumerate(self.project.frames):
+            if f.uid == src.uid:
+                return i
+        return None
+
+    def paste_frame(self, after: bool, src: Frame | None = None) -> bool:
+        """Insert a copy of the copied frame (`src`, default: the remembered frame) before or after that frame, as one
+        Undo step. Does nothing if the frame no longer exists."""
+        src = src if src is not None else self.frame_clipboard
+        ref = self.copied_index(src)
+        if self.project is None or src is None or self.edit.mode or ref is None:
             return False
         self.stop_run()
         before = self.checkpoint()
         try:
-            idx = edit.clone_frame(self.project, src, self.selected, after)
+            idx = edit.clone_frame(self.project, src, ref, after)
         except edit.EditError as e:
             messages.warn(self.parent_widget, str(e))
             return False
@@ -140,7 +152,7 @@ class Controller(QObject):
             return False
         self.select(index)
         f = self.project.frames[index]
-        return self.paste_frame(after, Frame(f.label, f.image, layers=f.layers))
+        return self.paste_frame(after, Frame(f.label, f.image, layers=f.layers, uid=f.uid))
 
     def move_selected(self, delta: int) -> bool:
         """Ctrl+Left / Ctrl+Right: move the selected frame one place."""

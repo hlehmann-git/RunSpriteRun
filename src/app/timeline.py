@@ -16,13 +16,14 @@ from src.app.panel import Panel
 from src.app.theme import SCROLLBAR_STYLE
 from src.app.render import scaled_sprite, to_qimage
 from src.core.edit import group_of_frame
-from src.core.rules import LABEL_MAX
+from src.core.rules import NAME_MAX, name_of
 
 VISIBLE = 8
 BOX_W, BOX_H, PITCH = 112, 112, 118       # a frame box and the distance between boxes
 FIRST_X = 272                            # left edge of the first box in the panel
 THUMB_Y = 42
 ROW_H = 16
+SUFFIX_W = 34                               # room for the fixed _NNN after a name
 NUMBER_Y, LABEL_Y, GROUP_Y = 158, 178, 198
 DRAG_START = 6                           # pixels the pointer must move before a drag begins
 
@@ -118,11 +119,15 @@ class Slot(QWidget):
         self.thumb.move(0, THUMB_Y)
         self.number = self._cell(NUMBER_Y)
         self.group = self._cell(GROUP_Y)
-        self.label = QLineEdit(self)
-        self.label.setGeometry(0, LABEL_Y, BOX_W, ROW_H)
-        self.label.setMaxLength(LABEL_MAX)
+        self.label = QLineEdit(self)                     # the name; the number after it is set by the program
+        self.label.setGeometry(0, LABEL_Y, BOX_W - SUFFIX_W, ROW_H)
+        self.label.setMaxLength(NAME_MAX)
         self.label.setAlignment(Qt.AlignCenter)
         self.label.setStyleSheet(self._style(True))
+        self.suffix = QLabel(self)
+        self.suffix.setGeometry(BOX_W - SUFFIX_W, LABEL_Y, SUFFIX_W, ROW_H)
+        self.suffix.setAlignment(Qt.AlignCenter)
+        self.suffix.setStyleSheet(self._style(False))
 
     def _cell(self, y: int) -> QLabel:
         lab = QLabel(self)
@@ -291,8 +296,11 @@ class TimelinePanel(Panel):
                              i == self.playing or (self.controller.running and self.controller.runner.animating and i == self.run_index),
                              e.mode and i == e.idx)
             s.number.setText(str(i + 1))
-            if s.label.text() != frame.label:
-                s.label.setText(frame.label)
+            name = name_of(frame.label)
+            if s.label.text() != name:
+                s.label.setText(name)
+            s.suffix.setText(frame.label[len(name):])
+            s.label.setToolTip(frame.label)
             s.group.setText(g or "")
             s.set_copied(frame.copied)
             s.label.setReadOnly(self.controller.edit.mode)      # no renaming while editing
@@ -336,11 +344,12 @@ class TimelinePanel(Panel):
     def _paste(self) -> None:
         c = self.controller
         src = c.frame_clipboard
-        if c.project is None or c.edit.mode or src is None:
-            return                                   # nothing copied: do nothing
+        ref = c.copied_index()
+        if c.project is None or c.edit.mode or src is None or ref is None:
+            return                                   # nothing copied, or the copied frame is gone: do nothing
         self._asking = True                          # the question window takes the focus; keep the copied frame
         try:
-            dlg = PasteFrameDialog(self, c.selected + 1, src.label)
+            dlg = PasteFrameDialog(self, ref + 1, c.project.frames[ref].label)
             ok = dlg.exec()
         finally:
             self._asking = False
@@ -375,7 +384,7 @@ class TimelinePanel(Panel):
         if self.controller.project is None or i >= self.frame_count():
             return
         if not self.controller.rename(i, s.label.text()):
-            s.label.setText(self.controller.project.frames[i].label)   # refused: put the old label back
+            s.label.setText(name_of(self.controller.project.frames[i].label))   # refused: put the old name back
 
     # ---- drag to reorder ---------------------------------------------------------------------
     def _gap_at(self, x: int) -> int:

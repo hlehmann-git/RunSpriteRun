@@ -1,15 +1,15 @@
-"""Ctrl+V in the Timeline: before or after the selected frame?"""
+"""Ctrl+V in the Timeline: before or after the frame that was copied?"""
 from PySide6.QtWidgets import QButtonGroup, QDialog, QDialogButtonBox, QLabel, QRadioButton, QVBoxLayout
 
 
 class PasteFrameDialog(QDialog):
-    def __init__(self, parent, selected_number: int, copied_label: str) -> None:
+    def __init__(self, parent, copied_number: int, copied_label: str) -> None:
         super().__init__(parent)
         self.setWindowTitle("Paste frame")
         lay = QVBoxLayout(self)
         lay.addWidget(QLabel(f"Paste a copy of {copied_label}:"))
-        self.before = QRadioButton(f"Before the selected frame ({selected_number})")
-        self.after = QRadioButton(f"After the selected frame ({selected_number})")
+        self.before = QRadioButton(f"Before the copied frame ({copied_number})")
+        self.after = QRadioButton(f"After the copied frame ({copied_number})")
         self.after.setChecked(True)
         group = QButtonGroup(self)
         group.addButton(self.before)

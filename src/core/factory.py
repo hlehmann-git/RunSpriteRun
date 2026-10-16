@@ -19,8 +19,11 @@ def create_project(name: str, system: System, width: int, height: int,
         raise CreateProjectError("Invalid frames per second.")
     if not result.can_create:
         raise CreateProjectError("The import is not ready to create a project.")
-    return Project(
+    project = Project(
         name=name, system=system, width=width, height=height, fps=fps,
         transparent=result.transparent_default,
         frames=[Frame(f.label, f.image) for f in result.frames],
     )
+    from .edit import renumber
+    renumber(project)                       # labels are name_NNN, the number being the frame's position
+    return project

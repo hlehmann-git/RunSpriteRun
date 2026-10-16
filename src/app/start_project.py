@@ -537,7 +537,7 @@ class StartProjectDialog(QDialog):
         system = self.selected_system()
         w, h = self.width_box.value(), self.height_box.value()
         transparent = snap_colour((255, 0, 255), system.bits)
-        result = ImportResult(frames=[ImportedFrame(f"Frame_{n}", Image.new("RGB", (w, h), transparent))
+        result = ImportResult(frames=[ImportedFrame("Frame", Image.new("RGB", (w, h), transparent))
                                       for n in range(1, self.blank_frames.value() + 1)])
         self.project = create_project(self.name.text(), system, w, h, result, self.fps.currentData())
         self.project.transparent = transparent

@@ -36,7 +36,7 @@ def test_empty_boxes_left_out(tmp_path):
     _, im = sheet(tmp_path)
     g = sheet_import.find_grid(im, (0, 255, 0))
     res = sheet_import.import_sheet(im, "mysheet", g, (255, 0, 255), ST)
-    assert [f.label for f in res.frames] == ["mysheet_001", "mysheet_003"]
+    assert [f.label for f in res.frames] == ["mysheet", "mysheet"]            # named after the sheet; the project numbers them
     assert res.can_create
 
 

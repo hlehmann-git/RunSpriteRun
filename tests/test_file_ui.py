@@ -70,10 +70,10 @@ def test_save_as_makes_project_folder_then_save_state(win, tmp_path, monkeypatch
     assert p.name == "Hero"                                      # Save As makes a new project: renamed
     assert open_project(target).name == "Hero"
     assert not win.act_save.isEnabled()                          # nothing new to save
-    win.controller.rename(0, "walk")
+    win.controller.rename(0, "walk")                              # frame 1 is in the only group: both rename
     assert win.act_save.isEnabled() and p.dirty
     win.act_save.trigger()
-    assert open_project(target).frames[0].label == "walk" and not win.act_save.isEnabled()
+    assert open_project(target).frames[0].label == "walk_001" and not win.act_save.isEnabled()
 
 
 def test_save_on_never_saved_project_uses_save_as(win, tmp_path, monkeypatch):
@@ -142,13 +142,12 @@ def test_info_bar_follows_project(win, tmp_path, monkeypatch):
     assert bar.label.text().endswith("Frame Groups: 0")
 
 
-def test_save_reminds_about_red_labels(win, tmp_path, monkeypatch):
+def test_save_no_longer_reminds_about_labels(win, tmp_path, monkeypatch):
     shown = []
     monkeypatch.setattr(messages, "info", lambda p, t, d=None: shown.append(t))
-    win.controller.project.frames[1].copied = True
     dialogs(monkeypatch, save_as=("R", str(tmp_path)))
-    assert win.save_as() and shown == ["Correct duplicate frame labels."]
-    assert open_project(tmp_path / "R" / "R.rsr").frames[1].copied                    # stays red after reopening
+    assert win.save_as() and shown == []                                               # the red-label reminder is gone
+    assert not any(f.copied for f in open_project(tmp_path / "R" / "R.rsr").frames)
 
 
 def test_open_replaces_project_and_clears_history(win, tmp_path, monkeypatch):

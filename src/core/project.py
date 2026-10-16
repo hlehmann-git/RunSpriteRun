@@ -1,6 +1,7 @@
 """Project model (section 6.2). No UI code here."""
 from __future__ import annotations
 
+import itertools
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -29,12 +30,16 @@ class Group:
     colour: Colour = (0, 0, 0)   # interface-only border colour (FR-3.11)
 
 
+_uids = itertools.count(1)
+
+
 @dataclass
 class Frame:
     label: str
     image: Image.Image     # mode "RGB", every colour valid for the system
     copied: bool = False   # made by 'Copy into new group' and not renamed yet (shown red in the timeline)
     layers: tuple | None = None   # V2.0: (ForeGround, Core, BackGround) images; None = never edited, all on Core. `image` is the flattened result
+    uid: int = field(default_factory=lambda: next(_uids))   # identifies the frame through moves and Undo
 
 
 @dataclass

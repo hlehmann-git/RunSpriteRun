@@ -2,38 +2,73 @@
 Pure logic with no UI. Anything that needs the owner's confirmation is passed in as a function."""
 from __future__ import annotations
 
-import re
+from collections import Counter
 from typing import Callable
 
 from .colour import Colour
 from . import groups as group_rules
 from .project import Frame, Group, Project, Rule
-from .rules import LABEL_MAX, MAX_FRAMES, MAX_GROUPS, copy_label, valid_group_name, valid_label
+from .rules import MAX_FRAMES, MAX_GROUPS, make_label, name_of, old_label_name, valid_frame_name, valid_group_name
 
-MSG_LABEL_CHARS = "Labels can only use letters, numbers, - and _ (no spaces)."
-MSG_LABEL_DUPLICATE = "Frame labels must be unique."
+MSG_LABEL_CHARS = "Names can only use letters, numbers, - and _ (no spaces)."
+MSG_NAME_EMPTY = "A frame needs a name."
 
 
 class EditError(ValueError):
     """The edit is refused; the message is the one to show the owner."""
 
 
-def rename_label(project: Project, index: int, new: str) -> bool:
-    """Set a frame's label. Returns False if nothing changed. Rules that pointed to the old label follow."""
-    old = project.frames[index].label
-    if new == old:
+def _apply_names(project: Project, names: list[str]) -> bool:
+    """Give frame i the label <names[i]>_<i+1, three digits>. Rules that pointed at a renamed label follow it.
+    Returns True if any label changed."""
+    old = [f.label for f in project.frames]
+    seen = Counter(old)
+    mapping: dict[str, str] = {}
+    for i, f in enumerate(project.frames):
+        new = make_label(names[i], i + 1)
+        if new != f.label:
+            if seen[f.label] == 1:
+                mapping[f.label] = new
+            f.label = new
+    if not mapping and old == [f.label for f in project.frames]:
         return False
-    if not valid_label(new):
-        raise EditError(MSG_LABEL_CHARS)
-    if any(f.label.lower() == new.lower() for i, f in enumerate(project.frames) if i != index):
-        raise EditError(MSG_LABEL_DUPLICATE)
-    project.frames[index].label = new
-    project.frames[index].copied = False                     # a label chosen by the owner is no longer red
     for rule in _all_rules(project):
-        if rule.kind == "frame" and rule.target == old:
-            rule.target = new
+        if rule.kind == "frame" and rule.target in mapping:
+            rule.target = mapping[rule.target]
     project.dirty = True
     return True
+
+
+def renumber(project: Project) -> bool:
+    """Every frame's number becomes its position (001 to 120); names are kept."""
+    return _apply_names(project, [name_of(f.label) for f in project.frames])
+
+
+def convert_old_labels(project: Project) -> None:
+    """A project saved before label numbering: the name is the old label without a trailing _number, the number is the
+    frame's position. Done without a message; the project is not marked as changed."""
+    dirty = project.dirty
+    for f in project.frames:
+        f.copied = False
+    _apply_names(project, [old_label_name(f.label) for f in project.frames])
+    project.dirty = dirty
+
+
+def rename_label(project: Project, index: int, new: str) -> bool:
+    """Set the name of a frame (the number is not touched). A frame in a group renames the whole group.
+    Returns False if nothing changed. Rules that pointed to a renamed label follow it."""
+    if not new:
+        raise EditError(MSG_NAME_EMPTY)
+    if not valid_frame_name(new):
+        raise EditError(MSG_LABEL_CHARS)
+    group = next((g for g in project.groups if g.first <= index <= g.last), None)
+    targets = range(group.first, group.last + 1) if group else [index]
+    names = [name_of(f.label) for f in project.frames]
+    for i in targets:
+        names[i] = new
+    for i in targets:
+        project.frames[i].copied = False
+    return _apply_names(project, names)
 
 
 def _all_rules(project: Project):
@@ -117,6 +152,7 @@ def move_frame(project: Project, src: int, dst: int,
                 other.on_release = None
         if project.start_state is not None and project.start_state.kind == "group" and project.start_state.target == g.name:
             project.start_state = None
+    renumber(project)
     project.dirty = True
     return True
 
@@ -139,21 +175,20 @@ def check_copy(project: Project, name: str, first: int, last: int) -> None:
 
 def copy_into_new_group(project: Project, name: str, first: int, last: int, key: str | None,
                         on_release: Rule | None, colour: Colour) -> Group:
-    """Copy frames first..last to the end of the timeline as a new group. The copies are labelled with the
-    original label plus _001 (_002 ...) and are flagged so the timeline shows them red until renamed."""
+    """Copy frames first..last to the end of the timeline as a new group. The copies are named after the new group
+    and numbered by their positions (IdleSlow_005, IdleSlow_006)."""
     check_copy(project, name, first, last)
-    labels = {f.label for f in project.frames}
     start = len(project.frames)
     for i in range(first, last + 1):
         src = project.frames[i]
-        label = copy_label(src.label, labels)
-        labels.add(label)
-        project.frames.append(Frame(label, src.image, copied=True, layers=src.layers))     # images are never changed in place
+        project.frames.append(Frame(make_label(name, 0), src.image, layers=src.layers))     # images are never changed in place
     try:
-        return group_rules.save_group(project, None, name, start, len(project.frames) - 1, key, on_release, colour)
+        group = group_rules.save_group(project, None, name, start, len(project.frames) - 1, key, on_release, colour)
     except Exception:
         del project.frames[start:]
         raise
+    renumber(project)
+    return group
 
 
 # ---- V2.0: a new frame made in Edit mode ---------------------------------------------------------------
@@ -161,38 +196,15 @@ MSG_FRAME_LIMIT = f"A project can have at most {MAX_FRAMES} frames."
 
 
 def new_frame_label(project: Project) -> str:
-    """Frame_<n>, the first number not already used as a label."""
-    used = {f.label.lower() for f in project.frames}
-    n = len(project.frames) + 1
-    while f"frame_{n}" in used:
-        n += 1
-    return f"Frame_{n}"
-
-
-_NUMBERED = re.compile(r"^(.*_)(\d+)$")
-
-
-def _group_numbering(project: Project, group: Group, skip: int) -> str | None:
-    """The shared text before the final number of the labels in `group` (for example "Idle_"), or None when the
-    labels do not all look like <text>_<number> with the same text. `skip` is a frame index to leave out."""
-    prefixes = set()
-    for i in range(group.first, group.last + 1):
-        if i == skip:
-            continue
-        m = _NUMBERED.match(project.frames[i].label)
-        if not m:
-            return None
-        prefixes.add(m.group(1))
-    return prefixes.pop() if len(prefixes) == 1 else None
+    """The label of a new blank frame before it is numbered: Frame (insert_frame numbers it)."""
+    return make_label("Frame", 0)
 
 
 def insert_frame(project: Project, index: int, frame: Frame, join: str | None = None, anchor: int | None = None,
                  after: bool = True) -> Group | None:
     """Put `frame` at `index`. If `join` names a group the frame becomes a member and the group grows (it can be the
-    first or last frame of it). A frame that joins a group whose labels all look like Idle_1, Idle_2 ... is labelled
-    to fit its place (Idle_4 when it goes after Idle_3) and the later frames of the group are renumbered only as far
-    as needed to keep labels unique; rules that pointed at renamed labels follow them. `anchor` is the index (before
-    the insert) of the frame it was inserted next to, and `after` says on which side. Returns the group joined."""
+    first or last frame of it). Every frame is then numbered by its position again. (`anchor` and `after` are no
+    longer needed and are kept only so that callers need not change.) Returns the group joined."""
     if len(project.frames) >= MAX_FRAMES:
         raise EditError(MSG_FRAME_LIMIT)
     index = max(0, min(index, len(project.frames)))
@@ -210,54 +222,18 @@ def insert_frame(project: Project, index: int, frame: Frame, join: str | None = 
                 g.last += 1
                 joined = g
     project.frames.insert(index, frame)
+    renumber(project)
     project.dirty = True
-    if joined is not None and anchor is not None:
-        _label_in_group(project, joined, index, anchor, after)
     return joined
 
 
-def clone_frame(project: Project, src: Frame, sel: int, after: bool) -> int:
-    """Timeline Copy / Paste: put a copy of `src` just before or after frame `sel` and return its index. The copy joins
-    the group of frame `sel` and is labelled to fit its place there (Idle_4, later frames renumbered); with no numbered
-    group to follow it is the original label with _001 added. Raises EditError at the 120 frame limit."""
+def clone_frame(project: Project, src: Frame, ref: int, after: bool) -> int:
+    """Timeline Paste: put a copy of `src` just before or after frame `ref` (the frame that was copied) and return the
+    copy's index. The copy keeps that frame's name, takes its position number and joins the group of frame `ref`, if
+    it has one. Raises EditError at the 120 frame limit."""
     if len(project.frames) >= MAX_FRAMES:
         raise EditError(MSG_FRAME_LIMIT)
-    frame = Frame(copy_label(src.label, {f.label for f in project.frames}), src.image, layers=src.layers)
-    index = sel + 1 if after else sel
-    insert_frame(project, index, frame, join=group_of_frame(project)[sel], anchor=sel, after=after)
+    frame = Frame(make_label(name_of(project.frames[ref].label), 0), src.image, layers=src.layers)
+    index = ref + 1 if after else ref
+    insert_frame(project, index, frame, join=group_of_frame(project)[ref])
     return index
-
-
-def _label_in_group(project: Project, group: Group, index: int, anchor: int, after: bool) -> None:
-    prefix = _group_numbering(project, group, skip=index)
-    if prefix is None:
-        return
-    anchor_now = anchor + 1 if anchor >= index else anchor          # the anchor frame after the insert
-    m = _NUMBERED.match(project.frames[anchor_now].label)
-    if not m:
-        return
-    digits = m.group(2)
-    width = len(digits) if digits.startswith("0") else 0
-    n = int(digits) + (1 if after else 0)
-    fmt = lambda k: f"{prefix}{k:0{width}d}"
-    plan = {index: fmt(n)}                                           # frame index -> new label
-    last = n
-    for i in range(index + 1, group.last + 1):
-        k = int(_NUMBERED.match(project.frames[i].label).group(2))
-        if k <= last:
-            k = last + 1
-            plan[i] = fmt(k)
-        last = k
-    renamed = {project.frames[i].label for i in plan if i != index}
-    others = {f.label.lower() for i, f in enumerate(project.frames) if i not in plan and f.label not in renamed}
-    new_labels = list(plan.values())
-    if (any(len(x) > LABEL_MAX for x in new_labels) or len({x.lower() for x in new_labels}) != len(new_labels)
-            or any(x.lower() in others for x in new_labels)):
-        return                                                       # would clash: keep the plain Frame_<n> label
-    mapping = {project.frames[i].label: lab for i, lab in plan.items() if i != index}
-    for i, lab in plan.items():
-        project.frames[i].label = lab
-        project.frames[i].copied = project.frames[i].copied if i != index else False
-    for rule in _all_rules(project):                                 # rules follow the renamed frames (all at once)
-        if rule.kind == "frame" and rule.target in mapping:
-            rule.target = mapping[rule.target]
