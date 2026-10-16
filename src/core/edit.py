@@ -216,6 +216,18 @@ def insert_frame(project: Project, index: int, frame: Frame, join: str | None = 
     return joined
 
 
+def clone_frame(project: Project, src: Frame, sel: int, after: bool) -> int:
+    """Timeline Copy / Paste: put a copy of `src` just before or after frame `sel` and return its index. The copy joins
+    the group of frame `sel` and is labelled to fit its place there (Idle_4, later frames renumbered); with no numbered
+    group to follow it is the original label with _001 added. Raises EditError at the 120 frame limit."""
+    if len(project.frames) >= MAX_FRAMES:
+        raise EditError(MSG_FRAME_LIMIT)
+    frame = Frame(copy_label(src.label, {f.label for f in project.frames}), src.image, layers=src.layers)
+    index = sel + 1 if after else sel
+    insert_frame(project, index, frame, join=group_of_frame(project)[sel], anchor=sel, after=after)
+    return index
+
+
 def _label_in_group(project: Project, group: Group, index: int, anchor: int, after: bool) -> None:
     prefix = _group_numbering(project, group, skip=index)
     if prefix is None:

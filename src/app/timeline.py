@@ -7,10 +7,11 @@ from PIL import Image
 from PySide6.QtCore import QEvent, QPoint, QPointF, QRect, Qt, Signal
 from PySide6.QtWidgets import QApplication
 from PySide6.QtGui import QColor, QKeySequence, QPainter, QPen, QPolygonF, QShortcut
-from PySide6.QtWidgets import QLabel, QLineEdit, QScrollBar, QToolButton, QWidget
+from PySide6.QtWidgets import QLabel, QLineEdit, QMenu, QScrollBar, QToolButton, QWidget
 
 from src.app.controller import Controller
 from src.app.keys_panel import KeyPad
+from src.app.paste_frame_dialog import PasteFrameDialog
 from src.app.panel import Panel
 from src.app.theme import SCROLLBAR_STYLE
 from src.app.render import scaled_sprite, to_qimage
@@ -37,6 +38,7 @@ class Thumb(QWidget):
     pressed = Signal(int)
     dragged = Signal(int, QPoint)        # slot, pointer position in the timeline panel
     released = Signal(int, QPoint)
+    menu_requested = Signal(int, QPoint)  # slot, screen position (right click)
 
     def __init__(self, parent: QWidget, slot: int) -> None:
         super().__init__(parent)
@@ -85,6 +87,9 @@ class Thumb(QWidget):
         if e.button() == Qt.LeftButton:
             self._press, self._dragging = e.position().toPoint(), False
             self.pressed.emit(self.slot)
+
+    def contextMenuEvent(self, e) -> None:
+        self.menu_requested.emit(self.slot, e.globalPos())
 
     def mouseMoveEvent(self, e) -> None:
         if self._press is None:
@@ -173,6 +178,7 @@ class TimelinePanel(Panel):
             s.thumb.pressed.connect(lambda slot: self._click(slot))
             s.thumb.dragged.connect(self._drag_move)
             s.thumb.released.connect(self._drag_end)
+            s.thumb.menu_requested.connect(self._menu)
             s.label.editingFinished.connect(lambda s=s: self._label_done(s))
         for i, (text, y) in enumerate((("Frame number", NUMBER_Y), ("Frame Label", LABEL_Y), ("Frame Group", GROUP_Y))):
             lab = QLabel(text, self)
@@ -209,6 +215,10 @@ class TimelinePanel(Panel):
             Qt.WidgetWithChildrenShortcut)
         QShortcut(QKeySequence("Ctrl+Right"), self, lambda: controller.move_selected(1)).setContext(
             Qt.WidgetWithChildrenShortcut)
+        self.setFocusPolicy(Qt.ClickFocus)           # Ctrl+C / Ctrl+V work only while the last click was in this panel
+        QShortcut(QKeySequence("Ctrl+C"), self, self._copy).setContext(Qt.WidgetWithChildrenShortcut)
+        QShortcut(QKeySequence("Ctrl+V"), self, self._paste).setContext(Qt.WidgetWithChildrenShortcut)
+        QApplication.instance().focusChanged.connect(self._focus_changed)
         controller.project_changed.connect(self._project_changed)
         controller.frames_changed.connect(self.refresh)
         controller.edit.changed.connect(self.refresh)
@@ -307,7 +317,58 @@ class TimelinePanel(Panel):
 
     # ---- user actions ------------------------------------------------------------------------
     def _click(self, slot: int) -> None:
+        self.setFocus(Qt.MouseFocusReason)
         self.controller.select(self.first + slot)
+
+    # ---- copy and paste a frame --------------------------------------------------------------
+    def _focus_changed(self, old, new) -> None:
+        """Clicking out of this panel drops a copied frame, silently."""
+        if new is None or (new is not self and not self.isAncestorOf(new)):
+            if self.controller.frame_clipboard is not None and not self._asking:
+                self.controller.drop_frame_clipboard()
+
+    _asking = False
+
+    def _copy(self) -> None:
+        if not self.controller.edit.mode:
+            self.controller.copy_frame()
+
+    def _paste(self) -> None:
+        c = self.controller
+        src = c.frame_clipboard
+        if c.project is None or c.edit.mode or src is None:
+            return                                   # nothing copied: do nothing
+        self._asking = True                          # the question window takes the focus; keep the copied frame
+        try:
+            dlg = PasteFrameDialog(self, c.selected + 1, src.label)
+            ok = dlg.exec()
+        finally:
+            self._asking = False
+        if ok:
+            c.paste_frame(dlg.paste_after(), src)
+
+    def _exec_menu(self, menu: QMenu, pos: QPoint):
+        return menu.exec(pos)
+
+    def _menu(self, slot: int, pos: QPoint) -> None:
+        i = self.first + slot
+        c = self.controller
+        if c.project is None or c.edit.mode or i >= self.frame_count():
+            return
+        self.setFocus(Qt.MouseFocusReason)
+        c.select(i)
+        menu = QMenu(self)
+        before = menu.addAction("Copy before")
+        after = menu.addAction("Copy after")
+        self._asking = True
+        try:
+            chosen = self._exec_menu(menu, pos)
+        finally:
+            self._asking = False
+        if chosen is before:
+            c.clone_frame(i, False)
+        elif chosen is after:
+            c.clone_frame(i, True)
 
     def _label_done(self, s: Slot) -> None:
         i = self.first + s.slot

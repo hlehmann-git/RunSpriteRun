@@ -132,3 +132,196 @@ def test_long_frame_lists_drop_down_as_a_short_scrolling_list(win):
     fv = win.panels["Frame view"]
     assert fv.number.maxVisibleItems() == 10 and fv.label.maxVisibleItems() == 10
     assert "combobox-popup: 0" in fv.number.styleSheet()
+
+
+# ---- Timeline copy / paste ----
+def _ctrl(widget, key):
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+    widget.window().activateWindow()                     # shortcuts only fire in the active window
+    QApplication.processEvents()
+    QTest.keyClick(widget, key, Qt.ControlModifier)
+
+
+def _paste_dialog(monkeypatch, after=True, accept=True):
+    from src.app import timeline
+    seen = []
+
+    def fake_exec(self):
+        seen.append(self.windowTitle())
+        (self.after if after else self.before).setChecked(True)
+        return 1 if accept else 0
+    monkeypatch.setattr(timeline.PasteFrameDialog, "exec", fake_exec)
+    return seen
+
+
+def test_ctrl_c_ctrl_v_pastes_after_with_dialog_and_undo(win, monkeypatch):
+    from PySide6.QtCore import Qt
+    c, t = win.controller, tl(win)
+    seen = _paste_dialog(monkeypatch)
+    t.slots[2].thumb.pressed.emit(2)                      # click frame 3 (f3): the panel now has the focus
+    _ctrl(t, Qt.Key_C)
+    assert c.frame_clipboard is not None and c.frame_clipboard.label == "f3"
+    t.slots[5].thumb.pressed.emit(5)                      # select f6
+    _ctrl(t, Qt.Key_V)
+    labels = [f.label for f in c.project.frames]
+    assert seen == ["Paste frame"] and len(labels) == 13 and labels[6] == "f3_001" and c.selected == 6
+    assert c.history.can_undo
+    c.undo()
+    assert len(c.project.frames) == 12
+
+
+def test_paste_before_and_cancel(win, monkeypatch):
+    from PySide6.QtCore import Qt
+    c, t = win.controller, tl(win)
+    t.slots[0].thumb.pressed.emit(0)
+    _ctrl(t, Qt.Key_C)
+    t.slots[4].thumb.pressed.emit(4)
+    _paste_dialog(monkeypatch, accept=False)
+    _ctrl(t, Qt.Key_V)
+    assert len(c.project.frames) == 12 and c.frame_clipboard is not None      # cancelled: nothing changes
+    _paste_dialog(monkeypatch, after=False)
+    _ctrl(t, Qt.Key_V)
+    assert c.project.frames[4].label == "f1_001" and c.selected == 4
+
+
+def test_paste_with_nothing_copied_does_nothing(win, monkeypatch):
+    from PySide6.QtCore import Qt
+    t = tl(win)
+    seen = _paste_dialog(monkeypatch)
+    t.slots[0].thumb.pressed.emit(0)
+    _ctrl(t, Qt.Key_V)
+    assert seen == [] and len(win.controller.project.frames) == 12 and not shown
+
+
+def test_clicking_out_of_the_timeline_drops_the_copy(win, monkeypatch):
+    from PySide6.QtCore import Qt
+    c, t = win.controller, tl(win)
+    t.slots[0].thumb.pressed.emit(0)
+    _ctrl(t, Qt.Key_C)
+    assert c.frame_clipboard is not None
+    other = win.panels["Frame view"]
+    other.setFocusPolicy(Qt.StrongFocus)
+    other.setFocus()
+    QApplication.processEvents()
+    assert c.frame_clipboard is None
+
+
+def test_right_click_copy_before_and_after(win, monkeypatch):
+    from src.app.timeline import TimelinePanel
+    c, t = win.controller, tl(win)
+    pick = {"text": "Copy after"}
+    monkeypatch.setattr(TimelinePanel, "_exec_menu",
+                        lambda self, menu, pos: next(a for a in menu.actions() if a.text() == pick["text"]))
+    t.slots[2].thumb.menu_requested.emit(2, QPoint(0, 0))
+    assert [f.label for f in c.project.frames][2:4] == ["f3", "f3_001"] and c.selected == 3
+    pick["text"] = "Copy before"
+    t.slots[0].thumb.menu_requested.emit(0, QPoint(0, 0))
+    assert [f.label for f in c.project.frames][:2] == ["f1_001", "f1"] and c.selected == 0
+    assert c.frame_clipboard is None                      # the menu needs no Ctrl+C
+
+
+def test_shortcuts_do_nothing_in_edit_mode(win, monkeypatch):
+    from PySide6.QtCore import Qt
+    c, t = win.controller, tl(win)
+    t.slots[1].thumb.pressed.emit(1)
+    c.edit.begin()
+    _ctrl(t, Qt.Key_C)
+    assert c.frame_clipboard is None
+    assert not c.clone_frame(1, True) and len(c.project.frames) == 12
+
+
+# ---- Timeline copy / paste ----
+def _ctrl(widget, key):
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+    widget.window().activateWindow()                     # shortcuts only fire in the active window
+    QApplication.processEvents()
+    QTest.keyClick(widget, key, Qt.ControlModifier)
+
+
+def _paste_dialog(monkeypatch, after=True, accept=True):
+    from src.app import timeline
+    seen = []
+
+    def fake_exec(self):
+        seen.append(self.windowTitle())
+        (self.after if after else self.before).setChecked(True)
+        return 1 if accept else 0
+    monkeypatch.setattr(timeline.PasteFrameDialog, "exec", fake_exec)
+    return seen
+
+
+def test_ctrl_c_ctrl_v_pastes_after_with_dialog_and_undo(win, monkeypatch):
+    from PySide6.QtCore import Qt
+    c, t = win.controller, tl(win)
+    seen = _paste_dialog(monkeypatch)
+    t.slots[2].thumb.pressed.emit(2)                      # click frame 3 (f3): the panel now has the focus
+    _ctrl(t, Qt.Key_C)
+    assert c.frame_clipboard is not None and c.frame_clipboard.label == "f3"
+    t.slots[5].thumb.pressed.emit(5)                      # select f6
+    _ctrl(t, Qt.Key_V)
+    labels = [f.label for f in c.project.frames]
+    assert seen == ["Paste frame"] and len(labels) == 13 and labels[6] == "f3_001" and c.selected == 6
+    c.undo()
+    assert len(c.project.frames) == 12
+
+
+def test_paste_before_and_cancel(win, monkeypatch):
+    from PySide6.QtCore import Qt
+    c, t = win.controller, tl(win)
+    t.slots[0].thumb.pressed.emit(0)
+    _ctrl(t, Qt.Key_C)
+    t.slots[4].thumb.pressed.emit(4)
+    _paste_dialog(monkeypatch, accept=False)
+    _ctrl(t, Qt.Key_V)
+    assert len(c.project.frames) == 12 and c.frame_clipboard is not None      # cancelled: nothing changes
+    _paste_dialog(monkeypatch, after=False)
+    _ctrl(t, Qt.Key_V)
+    assert c.project.frames[4].label == "f1_001" and c.selected == 4
+
+
+def test_paste_with_nothing_copied_does_nothing(win, monkeypatch):
+    from PySide6.QtCore import Qt
+    t = tl(win)
+    seen = _paste_dialog(monkeypatch)
+    t.slots[0].thumb.pressed.emit(0)
+    _ctrl(t, Qt.Key_V)
+    assert seen == [] and len(win.controller.project.frames) == 12 and not shown
+
+
+def test_clicking_out_of_the_timeline_drops_the_copy(win, monkeypatch):
+    from PySide6.QtCore import Qt
+    c, t = win.controller, tl(win)
+    t.slots[0].thumb.pressed.emit(0)
+    _ctrl(t, Qt.Key_C)
+    assert c.frame_clipboard is not None
+    other = win.panels["Frame view"]
+    other.setFocusPolicy(Qt.StrongFocus)
+    other.setFocus()
+    QApplication.processEvents()
+    assert c.frame_clipboard is None
+
+
+def test_right_click_copy_before_and_after(win, monkeypatch):
+    from src.app.timeline import TimelinePanel
+    c, t = win.controller, tl(win)
+    pick = {"text": "Copy after"}
+    monkeypatch.setattr(TimelinePanel, "_exec_menu",
+                        lambda self, menu, pos: next(a for a in menu.actions() if a.text() == pick["text"]))
+    t.slots[2].thumb.menu_requested.emit(2, QPoint(0, 0))
+    assert [f.label for f in c.project.frames][2:4] == ["f3", "f3_001"] and c.selected == 3
+    pick["text"] = "Copy before"
+    t.slots[0].thumb.menu_requested.emit(0, QPoint(0, 0))
+    assert [f.label for f in c.project.frames][:2] == ["f1_001", "f1"] and c.selected == 0
+    assert c.frame_clipboard is None                      # the menu needs no Ctrl+C
+
+
+def test_shortcuts_do_nothing_in_edit_mode(win, monkeypatch):
+    from PySide6.QtCore import Qt
+    c, t = win.controller, tl(win)
+    t.slots[1].thumb.pressed.emit(1)
+    c.edit.begin()
+    _ctrl(t, Qt.Key_C)
+    assert c.frame_clipboard is None
+    assert not c.clone_frame(1, True) and len(c.project.frames) == 12

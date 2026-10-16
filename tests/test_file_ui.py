@@ -227,12 +227,38 @@ def test_help_and_about_text(win):
     assert "PySide6" in a.small_print.text()
 
 
-def test_settings_window_is_empty_with_ok(win):
+def test_settings_window_shows_project_fps(win):
     d = SettingsDialog(win)
-    assert [b.text() for b in d.findChildren(QPushButton)] == ["OK"]
+    assert [b.text() for b in d.findChildren(QPushButton)] == ["OK", "Cancel"]
+    assert [d.fps.itemText(i) for i in range(d.fps.count())] == ["3", "6", "12", "24"]
+    assert d.fps.currentText() == str(win.controller.project.fps)
+    d.show()
+    d.findChildren(QPushButton)[1].click()
+    assert not d.isVisible()
+
+
+def test_settings_ok_changes_project_fps_and_undo(win):
+    c = win.controller
+    assert c.project.fps == 12
+    d = SettingsDialog(win)
+    d.fps.setCurrentText("24")
     d.show()
     d.findChildren(QPushButton)[0].click()
-    assert not d.isVisible()
+    assert c.project.fps == 24 and c.can_undo
+    d2 = SettingsDialog(win)
+    assert d2.fps.currentText() == "24"
+    d2.fps.setCurrentText("6")
+    d2.show()
+    d2.findChildren(QPushButton)[1].click()          # Cancel changes nothing
+    assert c.project.fps == 24
+    c.undo()
+    assert c.project.fps == 12
+
+
+def test_settings_menu_needs_a_project(app):
+    from src.app.main_window import MainWindow
+    w = MainWindow()
+    assert not w.act_settings.isEnabled()
 
 
 def test_settings_ok_saves_and_applies(win, tmp_path, monkeypatch):

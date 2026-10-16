@@ -16,7 +16,6 @@ from src.app.group_preview import GroupPreviewPanel
 from src.app.edit_panel import EditPanel
 from src.app.run_panel import RunPanel
 from src.app.set_group_panel import SetFrameGroupPanel
-from src.app.start_state_dialog import StartStateDialog
 from src.core import groups as group_rules
 from src.core.rules import MAX_GROUPS
 from src.app.colour_editor import PANEL_H, ColourEditorPanel
@@ -163,13 +162,11 @@ class MainWindow(QMainWindow):
         self.act_redo = a(self.menu_edit, "Redo", "Ctrl+Y")
         self.act_new_group = a(self.menu_group, "New Group", "Ctrl+G")
         self.act_delete_group = a(self.menu_group, "Delete Group")
-        self.act_start_state = a(self.menu_group, "Start State")
         self.act_help = a(self.menu_help, "RunSpriteRun Help (F1)", "F1")
         self.act_about = a(self.menu_about, "About RunSpriteRun")
         self.act_exit.triggered.connect(self.close)
         self.act_new_group.triggered.connect(lambda: self.set_frame_group.new_group())
         self.act_delete_group.triggered.connect(self.delete_group)
-        self.act_start_state.triggered.connect(self.show_start_state)
         self.act_undo.triggered.connect(lambda: self.controller.edit.undo() if self.controller.edit.mode else self.controller.undo())
         self.act_redo.triggered.connect(lambda: self.controller.edit.redo() if self.controller.edit.mode else self.controller.redo())
         self.act_new.triggered.connect(self.new_project)
@@ -399,7 +396,7 @@ class MainWindow(QMainWindow):
             self._edit_mode_changed()
         for act in (self.act_open, self.act_save, self.act_save_as, self.act_info, self.act_export,
                     self.act_settings, self.act_help, self.act_about,
-                    self.act_new_group, self.act_delete_group, self.act_start_state):
+                    self.act_new_group, self.act_delete_group):
             act.setEnabled(active)
         self._update_group_actions()
         self._update_edit_actions()
@@ -433,7 +430,6 @@ class MainWindow(QMainWindow):
         active = p is not None and not self.controller.edit.mode       # Group menu is off while editing
         self.act_new_group.setEnabled(active and len(p.groups) < MAX_GROUPS)
         self.act_delete_group.setEnabled(active and self.set_frame_group.current is not None)
-        self.act_start_state.setEnabled(active)
 
     def delete_group(self) -> None:
         name = self.set_frame_group.current
@@ -445,9 +441,3 @@ class MainWindow(QMainWindow):
         if affected:
             messages.info(self, group_rules.msg_rules_reset(name, affected))
 
-    def show_start_state(self) -> None:
-        if self.controller.project is None:
-            return
-        dialog = StartStateDialog(self, self.controller.project)
-        if dialog.exec() == StartStateDialog.Accepted:
-            self.controller.set_start_state(dialog.rule())

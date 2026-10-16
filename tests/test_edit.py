@@ -91,3 +91,52 @@ def test_delete_group_resets_rules():
     p.start_state = Rule("group", "A")
     assert delete_group(p, "A") == ["group B (On Release)", "Start state"]
     assert [g.name for g in p.groups] == ["B"] and p.groups[0].on_release is None and p.start_state is None
+
+
+# ---- Timeline copy / paste (clone_frame) ----
+def numbered(n=5, first=1, groups=None):
+    frames = [Frame(f"Idle_{i}", Image.new("RGB", (4, 4), (i, 0, 0))) for i in range(first, first + n)]
+    return Project("P", get_system("Amiga"), 4, 4, frames=frames, groups=groups if groups is not None else [Group("Idle", 0, n - 1)], dirty=False)
+
+
+def test_clone_after_renumbers_the_group():
+    from src.core.edit import clone_frame
+    p = numbered()
+    p.groups[0].on_release = Rule("frame", "Idle_4")
+    src = Frame("Idle_1", p.frames[0].image)
+    idx = clone_frame(p, src, 2, True)                       # after Idle_3
+    assert idx == 3 and labels(p) == ["Idle_1", "Idle_2", "Idle_3", "Idle_4", "Idle_5", "Idle_6"]
+    assert p.frames[3].image is src.image and (p.groups[0].first, p.groups[0].last) == (0, 5)
+    assert p.groups[0].on_release.target == "Idle_5" and p.dirty
+
+
+def test_clone_before_renumbers_from_the_selected_frame():
+    from src.core.edit import clone_frame
+    p = numbered()
+    idx = clone_frame(p, Frame("Idle_5", p.frames[4].image), 1, False)      # before Idle_2
+    assert idx == 1 and labels(p) == ["Idle_1", "Idle_2", "Idle_3", "Idle_4", "Idle_5", "Idle_6"]
+
+
+def test_clone_outside_a_group_gets_001():
+    from src.core.edit import clone_frame
+    p = make_project()
+    idx = clone_frame(p, Frame("f2", p.frames[2].image), 4, True)
+    assert idx == 5 and p.frames[5].label == "f2_001" and len(p.frames) == 7
+    idx = clone_frame(p, Frame("f2", p.frames[2].image), 4, True)
+    assert p.frames[5].label == "f2_002" and labels(p).count("f2_001") == 1
+
+
+def test_clone_follows_the_group_it_lands_in():
+    from src.core.edit import clone_frame
+    p = numbered(3)
+    p.frames.append(Frame("Jump", Image.new("RGB", (4, 4))))
+    clone_frame(p, Frame("Jump", p.frames[3].image), 2, True)         # a Jump copy after Idle_3 becomes Idle_4
+    assert labels(p) == ["Idle_1", "Idle_2", "Idle_3", "Idle_4", "Jump"] and p.groups[0].last == 3
+
+
+def test_clone_stops_at_120_frames():
+    from src.core.edit import clone_frame
+    p = make_project(120)
+    with pytest.raises(EditError, match="at most 120"):
+        clone_frame(p, p.frames[0], 0, True)
+    assert len(p.frames) == 120

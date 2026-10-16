@@ -9,8 +9,7 @@ from src.core.colour import snap_colour
 from src.app import messages
 from src.app.edit_session import EditSession
 from src.core import edit, groups, history, palette
-from src.core.project import Rule
-from src.core.project import Project
+from src.core.project import Frame, Project, Rule
 from src.core.runner import Runner
 from src.io import settings as settings_io
 
@@ -40,10 +39,12 @@ class Controller(QObject):
         self.history = history.History()
         self.edit = EditSession(self)
         self.eyedropper_armed = False      # set by the Colour editor
+        self.frame_clipboard: Frame | None = None    # Ctrl+C in the Timeline: the frame as it was when copied
         self.timer = QTimer(self)
         self.timer.timeout.connect(self._tick)
         self.frames_changed.connect(self._frames_changed)
         self.selection_changed.connect(self._selection_changed)
+        self.project_changed.connect(self.drop_frame_clipboard)
 
     def set_project(self, project: Project | None) -> None:
         self.stop_run()
@@ -102,6 +103,44 @@ class Controller(QObject):
         self.frames_changed.emit()
         self.selection_changed.emit(dst)
         return True
+
+    # ---- copy and paste a frame in the timeline ------------------------------------------------
+    def copy_frame(self) -> bool:
+        """Ctrl+C in the Timeline: remember the selected frame."""
+        if self.project is None or not self.project.frames or self.edit.mode:
+            return False
+        f = self.project.frames[self.selected]
+        self.frame_clipboard = Frame(f.label, f.image, layers=f.layers)
+        return True
+
+    def drop_frame_clipboard(self) -> None:
+        self.frame_clipboard = None
+
+    def paste_frame(self, after: bool, src: Frame | None = None) -> bool:
+        """Insert a copy of `src` (default: the remembered frame) before or after the selected frame, as one Undo step."""
+        src = src if src is not None else self.frame_clipboard
+        if self.project is None or src is None or self.edit.mode:
+            return False
+        self.stop_run()
+        before = self.checkpoint()
+        try:
+            idx = edit.clone_frame(self.project, src, self.selected, after)
+        except edit.EditError as e:
+            messages.warn(self.parent_widget, str(e))
+            return False
+        self.commit(before)
+        self.selected = idx
+        self.frames_changed.emit()
+        self.selection_changed.emit(idx)
+        return True
+
+    def clone_frame(self, index: int, after: bool) -> bool:
+        """Right-click Copy before / Copy after: select frame `index` and put a copy of it next to it."""
+        if self.project is None or self.edit.mode or not 0 <= index < len(self.project.frames):
+            return False
+        self.select(index)
+        f = self.project.frames[index]
+        return self.paste_frame(after, Frame(f.label, f.image, layers=f.layers))
 
     def move_selected(self, delta: int) -> bool:
         """Ctrl+Left / Ctrl+Right: move the selected frame one place."""
@@ -205,6 +244,8 @@ class Controller(QObject):
             return False
         before = self.checkpoint()
         p.fps = fps
+        if self.timer.isActive():
+            self.timer.setInterval(round(1000 / fps))      # RunSpriteRun is running: change its speed at once
         self.commit(before)
         self.frames_changed.emit()
         return True

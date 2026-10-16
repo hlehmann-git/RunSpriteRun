@@ -9,7 +9,6 @@ from PySide6.QtWidgets import QApplication
 from src.app import messages
 from src.app.group_preview import caption_text
 from src.app.main_window import MainWindow
-from src.app.start_state_dialog import StartStateDialog
 from src.core.project import Frame, Group, Project, Rule
 from src.core.systems import get_system
 
@@ -56,7 +55,8 @@ def fill(p, name, first, last, key="None"):
 
 
 def test_menu_states(win):
-    assert win.act_new_group.isEnabled() and win.act_start_state.isEnabled()
+    assert win.act_new_group.isEnabled()
+    assert [a.text() for a in win.menu_group.actions()] == ["New Group", "Delete Group"]
     assert win.act_delete_group.isEnabled()                   # frame 1 is in group Idle
     win.controller.select(9)                                  # a frame in no group: empty panel
     assert not win.act_delete_group.isEnabled()
@@ -132,18 +132,6 @@ def test_delete_group_confirm_and_rules_reset_message(win, log):
     assert log["info"][-1] == ("These rules pointed to Idle and have been reset: "
                                "group Right (On Release), Start state.")
     assert panel(win).current is None
-
-
-def test_start_state_dialog(win, app):
-    d = StartStateDialog(win, win.controller.project)
-    assert d.rule() == Rule("frame", "f1")                    # never set: Go To Frame 1
-    d.editor.radio_group.setChecked(True)
-    d.editor.group_combo.setCurrentIndex(1)
-    d.editor.loop.setChecked(True)
-    win.controller.set_start_state(d.rule())
-    assert win.controller.project.start_state == Rule("group", "Right", True)
-    d2 = StartStateDialog(win, win.controller.project)
-    assert d2.editor.radio_group.isChecked() and d2.editor.loop.isChecked() and d2.editor.group_combo.currentText() == "Right"
 
 
 def test_preview_plays_group_loop_only_when_play_is_clicked(win):
