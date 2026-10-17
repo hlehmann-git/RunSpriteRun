@@ -10,10 +10,10 @@ AppName=RunSpriteRun
 AppVersion={#AppVersion}
 AppVerName=RunSpriteRun {#AppVersion}
 AppPublisher=Harley Lehmann
-; Per-user install: no administrator rights needed. The Browse button adds a RunSpriteRun sub-folder to the chosen place.
+; Per-user install: no administrator rights needed. When the Browse button picks a folder, Inno Setup adds the RunSpriteRun
+; sub-folder to it (its default behaviour).
 PrivilegesRequired=lowest
 DefaultDirName={localappdata}\Programs\RunSpriteRun
-AppendDefaultDirName=yes
 DisableProgramGroupPage=yes
 DefaultGroupName=RunSpriteRun
 OutputDir=..\dist_installer
