@@ -7,12 +7,34 @@ import sys
 from pathlib import Path
 
 
+def _writable(folder: Path) -> bool:
+    """True if a file can be made in `folder`."""
+    try:
+        probe = folder / ".rsr_write_test"
+        probe.write_bytes(b"")
+        probe.unlink()
+        return True
+    except OSError:
+        return False
+
+
 def home_folder() -> Path:
+    """The folder holding Projects, Exports, Blank sprite sheets and Examples. Installed (packaged) it is the install
+    folder; if Windows does not let the program write there (for example it was put in Program Files), the work goes to
+    Documents\\RunSpriteRun instead."""
     env = os.environ.get("RUNSPRITERUN_HOME")
     if env:
         return Path(env)
     if getattr(sys, "frozen", False):
-        return Path(sys.executable).resolve().parent
+        here = Path(sys.executable).resolve().parent
+        if _writable(here):
+            return here
+        fallback = Path.home() / "Documents" / "RunSpriteRun"
+        try:
+            fallback.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            return here
+        return fallback
     return Path(__file__).resolve().parents[2]
 
 

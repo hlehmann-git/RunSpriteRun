@@ -16,3 +16,9 @@ Exports/*
 !Exports/.gitkeep
 Blank sprite sheets/*
 !Blank sprite sheets/.gitkeep
+
+# Built by the Windows build
+packaging/RunSpriteRun.ico
+dist/
+build/
+dist_installer/

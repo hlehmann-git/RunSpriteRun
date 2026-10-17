@@ -9,10 +9,10 @@ from PySide6.QtWidgets import (QDialog, QGridLayout, QHBoxLayout, QLabel, QPlain
                                QVBoxLayout, QWidget)
 
 from src.core.project import Project
+from src.version import VERSION
 
 APP_NAME = "RunSpriteRun"
 AUTHOR = "Harley Lehmann"
-VERSION = "2.0.1"
 CLAUDE_COMMENTS = 5649      # a nice touch from the owner, never updated
 BRAND_IMAGE = Path(__file__).parent / "assets" / "brand.png"
 ABOUT_DESCRIPTION = [
