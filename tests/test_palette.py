@@ -48,6 +48,8 @@ def test_unused_transparent_replace():
 
 def test_square_geometry_matches_prd():
     for s in SYSTEMS:
+        if s.is_fixed:
+            continue                                            # fixed-palette systems have no colour square
         img = palette.square_image(s)
         assert img.size == (128, 128)
         assert img.getpixel((50, 70)) == palette.colour_at(s, 50, 70)
@@ -63,6 +65,8 @@ def test_square_geometry_matches_prd():
 
 def test_marker_round_trip():
     for s in SYSTEMS:
+        if s.is_fixed:
+            continue
         c = palette.colour_at(s, 77, 33)
         x, y, w, h = palette.marker_rect(s, c, (77, 33))
         assert palette.colour_at(s, x, y) == c

@@ -24,6 +24,8 @@ def create_project(name: str, system: System, width: int, height: int,
         transparent=result.transparent_default,
         frames=[Frame(f.label, f.image) for f in result.frames],
     )
+    if system.is_fixed:
+        project.extra_colours = list(system.fixed)      # every colour of the system is in the palette from the start
     from .edit import renumber
     renumber(project)                       # labels are name_NNN, the number being the frame's position
     return project

@@ -286,8 +286,9 @@ class EditPanel(Panel):
         plus = self.tool_buttons["plus"]
         p = self.controller.project
         full = p is not None and len(p.palette()) >= p.system.max_colours
-        plus.setEnabled(e.mode and not full)
-        plus.setToolTip("The palette is full" if full else TOOL_TIPS["plus"])
+        fixed = p is not None and p.system.is_fixed
+        plus.setEnabled(e.mode and not full and not fixed)
+        plus.setToolTip("The colours of this system are fixed" if fixed else "The palette is full" if full else TOOL_TIPS["plus"])
         can_rotate = e.can_rotate()
         for n in ("rotate_right", "rotate_left"):
             self.actions[n].setEnabled(e.mode and can_rotate)

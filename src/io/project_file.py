@@ -11,7 +11,6 @@ from pathlib import Path
 
 from PIL import Image
 
-from src.core.colour import snap_colour, snap_lut
 from src.core.layers import colours_of, flatten
 from src.core.project import Frame, Group, Project, Rule
 from src.core.rules import FPS_CHOICES, MAX_FRAMES, MAX_SIZE, MIN_SIZE, valid_label, valid_project_name
@@ -129,14 +128,13 @@ def open_project(path: str | Path) -> Project:
             if not isinstance(entries, list) or not 1 <= len(entries) <= MAX_FRAMES:
                 raise ProjectFileError("The number of frames in the file is not valid.")
 
-            lut = snap_lut(system.bits) * 3
 
             def load_image(name: str) -> Image.Image:
                 with Image.open(io.BytesIO(_read(z, name))) as im:
                     img = im.convert("RGB") if im.mode != "RGB" else im.copy()
                 if img.size != (w, h):
                     raise ProjectFileError("A frame does not match the project frame size.")
-                if img.point(lut).tobytes() != img.tobytes():
+                if system.snap_image(img) is not img:
                     raise ProjectFileError("A frame contains colours that are not valid for the system.")
                 return img
             transparent = tuple(meta["transparent"])
@@ -166,7 +164,7 @@ def open_project(path: str | Path) -> Project:
             extra = []
             for c in meta.get("extra_colours", []):
                 c = tuple(c)
-                if len(c) != 3 or any(not isinstance(v, int) for v in c) or snap_colour(c, system.bits) != c:
+                if len(c) != 3 or any(not isinstance(v, int) for v in c) or not system.valid(c):
                     raise ProjectFileError("A colour in the file is not valid for the system.")
                 extra.append(c)
             if len(used | {transparent} | set(extra)) > system.max_colours:

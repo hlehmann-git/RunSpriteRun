@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 
 from PIL import Image
 
-from .colour import Colour, snap_lut
+from .colour import Colour
 from .importer import ImportedFrame, ImportResult, Skipped, Adjustment, MSG_TRANSPARENCY, msg_too_many_colours, \
     msg_frame_limit
 from .rules import MAX_FRAMES, MAX_SIZE, MIN_SIZE, default_label
@@ -105,7 +105,6 @@ def import_sheet(im: Image.Image, stem: str, grid: SheetGrid, fill: Colour, syst
         return res
     rgb = im.convert("RGB")
     w, h = grid.width, grid.height
-    lut = snap_lut(system.bits) * 3
     colours: set[Colour] = set()
     labels: set[str] = set()
     pieces = []
@@ -122,18 +121,18 @@ def import_sheet(im: Image.Image, stem: str, grid: SheetGrid, fill: Colour, syst
         res.rejected = msg_frame_limit(len(pieces))
         return res
     for _, piece in pieces:
-        colours |= {c for _, c in piece.point(lut).getcolors(w * h)}
-    colours.add((lut[fill[0]], lut[fill[1]], lut[fill[2]]))                                  # the fill colour becomes the transparent colour
+        colours |= {c for _, c in system.snap_image(piece).getcolors(w * h)}
+    colours.add(system.snap(fill))                                  # the fill colour becomes the transparent colour
     if len(colours) > system.max_colours:
         res.rejected = msg_sheet_colours(system.name, system.max_colours)
         return res
     for n, piece in pieces:
         name = f"{stem} box {n}"
-        snapped = piece.point(lut)
+        snapped = system.snap_image(piece)
         if snapped.tobytes() != piece.tobytes():
             details = []
             for _, orig in piece.getcolors(w * h):
-                adj = (lut[orig[0]], lut[orig[1]], lut[orig[2]])
+                adj = system.snap(orig)
                 if adj != orig:
                     details.append((orig, adj))
             res.adjustments.append(Adjustment(name, len(details), details))

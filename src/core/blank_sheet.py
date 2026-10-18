@@ -26,6 +26,8 @@ FOLDER_NAMES = {
     "Atari ST": "Atari_ST",
     "Atari STE": "Atari_STE",
     "Amiga": "Amiga",
+    "Commodore 64": "Commodore_64",
+    "Apple II (Double Hi-Res)": "Apple_II_DoubleHiRes",
 }
 
 MSG_TOO_MANY = "A blank sprite sheet can hold at most 120 sprites and be 2,048 pixels wide."
@@ -62,8 +64,11 @@ def text_lines(system: System, w: int, h: int, per_row: int, rows: int, box: Col
     hexs = lambda c: "#%02X%02X%02X" % tuple(c)
     return [
         f"RunSpriteRun {title}: {system.name}",
-        f"Colour depth: {system.depth_label}, {system.bits} bits per channel ({system.levels} levels). "
-        f"{system.total_colours:,} colours available.",
+        (f"Colours: {system.depth_label}. The colours cannot be changed. Other colours in a sheet are changed to the "
+         f"nearest of the {system.total_colours} when it is imported."
+         if system.is_fixed else
+         f"Colour depth: {system.depth_label}, {system.bits} bits per channel ({system.levels} levels). "
+         f"{system.total_colours:,} colours available."),
         f"Palette limit: at most {system.max_colours} colours in all the sprites, including the transparent colour.",
         f"Sprites: {w} x {h} pixels, {per_row} per row, {rows} rows ({per_row * rows if count is None else count} sprites).",
         f"The {hexs(box)} lines are guides: do not use that colour in the sprites. "

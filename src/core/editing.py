@@ -113,7 +113,8 @@ def set_frame_layers(project: Project, index: int, layers) -> None:
 
 
 def can_add_colour(project: Project, colour: Colour) -> bool:
-    return colour not in project.palette() and len(project.palette()) < project.system.max_colours
+    return (not project.system.is_fixed and colour not in project.palette()
+            and len(project.palette()) < project.system.max_colours)
 
 
 def add_colour(project: Project, colour: Colour) -> bool:

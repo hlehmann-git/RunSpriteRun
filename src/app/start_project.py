@@ -298,7 +298,7 @@ class StartProjectDialog(QDialog):
         s = self.selected_system()
         vals = self._detail_values
         vals["Max sprite colours"].setText(str(s.max_colours))
-        vals["Bits per channel"].setText(str(s.bits))
+        vals["Bits per channel"].setText("Not used: the colours are fixed" if s.is_fixed else str(s.bits))
         vals["Colour depth"].setText(s.depth_label)
         vals["Total palette colours"].setText(f"{s.total_colours:,}")
 
@@ -526,7 +526,7 @@ class StartProjectDialog(QDialog):
             self._centre_on_canvas(result, canvas)
             size = canvas
         self.project = create_project(self.name.text(), system, size[0], size[1], result, self.fps.currentData())
-        self.project.transparent = self.fill_colour.colour
+        self.project.transparent = system.snap(self.fill_colour.colour)
         self.project.source_sheet = str(self._sheet_path)
         self.accept()
 
@@ -536,7 +536,7 @@ class StartProjectDialog(QDialog):
             return
         system = self.selected_system()
         w, h = self.width_box.value(), self.height_box.value()
-        transparent = snap_colour((255, 0, 255), system.bits)
+        transparent = system.default_transparent if system.is_fixed else snap_colour((255, 0, 255), system.bits)
         result = ImportResult(frames=[ImportedFrame("Frame", Image.new("RGB", (w, h), transparent))
                                       for n in range(1, self.blank_frames.value() + 1)])
         self.project = create_project(self.name.text(), system, w, h, result, self.fps.currentData())

@@ -70,7 +70,7 @@ def test_limits_and_messages():
 
 def test_folder_and_file_names(tmp_path):
     names = {s.name: bs.system_folder(s) for s in SYSTEMS}
-    assert sorted(names.values()) == ["Amiga", "Atari_ST", "Atari_STE", "Genesis_Megadrive", "Master_System", "SuperFamicom_SNES"]
+    assert sorted(names.values()) == ["Amiga", "Apple_II_DoubleHiRes", "Atari_ST", "Atari_STE", "Commodore_64", "Genesis_Megadrive", "Master_System", "SuperFamicom_SNES"]
     assert bs.file_name(ST, 32, 32, 10, 4) == "BlankSheet_Atari_ST_32x32_10x4.png"
     p = blank_file.write(ST, 8, 8, 4, 2, GREEN, WHITE, tmp_path)
     assert p == tmp_path / "Atari_ST" / "BlankSheet_Atari_ST_8x8_4x2.png"

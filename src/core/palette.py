@@ -18,7 +18,7 @@ def replace_colour(project: Project, old: Colour, new: Colour) -> None:
     """Every pixel of colour `old` becomes `new` (snapped to the system). New image objects are made so
     that earlier states (undo) keep their own images. If `old` was the transparent colour the transparent
     colour becomes `new`: the slot stays transparent."""
-    new = snap_colour(new, project.system.bits)
+    new = project.system.snap(new)
     if new == old:
         return
     def remap(img):
@@ -51,7 +51,7 @@ def set_transparent(project: Project, colour: Colour) -> None:
 def is_duplicate(project: Project, slot: int, new: Colour) -> bool:
     """True if `new` (snapped) is already in the palette in a different slot."""
     colours = project.palette()
-    new = snap_colour(new, project.system.bits)
+    new = project.system.snap(new)
     return new in colours and colours[slot] != new
 
 
@@ -109,7 +109,7 @@ def square_image(system: System) -> Image.Image:
 def marker_rect(system: System, colour: Colour, hint: tuple[int, int] | None = None) -> tuple[int, int, int, int] | None:
     """(x, y, w, h) of the square cell holding `colour`. In the SNES square several cells can hold the
     same colour; the one nearest `hint` (the last point clicked) is used."""
-    colour = snap_colour(colour, system.bits)
+    colour = system.snap(colour)
     if _is_stepped(system):
         hx, hy = hint if hint is not None else (0, 0)
         best, best_d = None, None

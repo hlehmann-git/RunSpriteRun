@@ -11,7 +11,7 @@ from src.app.panel import Panel
 from src.app.pixel_icons import SIZE, eyedropper
 from src.app.theme import TOGGLE_BUTTON_STYLE
 from src.core import palette
-from src.core.colour import Colour, level_to_8bit, snap_colour, to_hex, to_level, parse_hex
+from src.core.colour import Colour, level_to_8bit, to_hex, to_level, parse_hex
 
 ARMED = "#FFD24D"          # yellow border: this box will be used by the next click on a palette square
 NORMAL = "#e6e8ee"
@@ -193,8 +193,15 @@ class ColourEditorPanel(Panel):
         self._hint: tuple[int, int] | None = None
         self._busy = False
 
+        self.locked = False
         self.square = ColourSquare(self)
         self.square.move(16, 16)
+        self.note = QLabel("", self)
+        self.note.setGeometry(16, 16, 128, 128)
+        self.note.setWordWrap(True)
+        self.note.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+        self.note.setStyleSheet("color: #aab0bf;")
+        self.note.hide()
         self.square.picked.connect(self._square_picked)
 
         self.sliders: list[QSlider] = []
@@ -270,12 +277,13 @@ class ColourEditorPanel(Panel):
 
     def _project_changed(self) -> None:
         p = self.controller.project
-        self.square.set_system(p.system if p else None)
+        self.square.set_system(p.system if p and not p.system.is_fixed else None)
         top = (1 << p.system.bits) - 1 if p else 7
         self._busy = True
         for s in self.sliders:
             s.setRange(0, top)
         self._busy = False
+        self._set_locked(p is not None and p.system.is_fixed)
         self._disarm()
         self._hint = None
         pal = p.palette() if p else [(0, 0, 0)]
@@ -295,7 +303,7 @@ class ColourEditorPanel(Panel):
         bits = self._bits()
         if which is not None:
             self.current = which
-        self.colour = snap_colour(colour, bits)
+        self.colour = p.system.snap(colour) if p else colour
         self.cols[self.current] = self.colour
         self._busy = True
         for s, v, lab in zip(self.sliders, self.colour, self.values):
@@ -311,10 +319,25 @@ class ColourEditorPanel(Panel):
             self._arm("preview")
         self._sync_pair()
 
+    def _set_locked(self, locked: bool) -> None:
+        """A fixed-palette system (C64, Apple II): its colours cannot be changed, so the square, sliders and Hex box
+        are switched off. The palette, the picker and the transparent colour still work."""
+        self.locked = locked
+        self.square.setEnabled(not locked)
+        self.square.setVisible(not locked)
+        for w in (*self.sliders, *self.minus_btns, *self.plus_btns, self.hex):
+            w.setEnabled(not locked)
+        if locked:
+            self.note.setText("The colours of this system are fixed. Pick one from the palette; "
+                              "use T to choose the transparent colour.")
+        self.note.setVisible(locked)
+
     def _sync_pair(self) -> None:
         self.preview.set_state(self.cols["primary"], self.cols["secondary"], self.current, self.armed)
 
     def _arm(self, which: str | None) -> None:
+        if which == "preview" and getattr(self, "locked", False):
+            which = None                                     # nothing to overwrite: the colours are fixed
         self.armed = which == "preview"
         self.transparent_armed = which == "transparent"
         self.eyedropper_armed = which == "eyedropper"
@@ -348,7 +371,8 @@ class ColourEditorPanel(Panel):
         if c is None:
             self.hex.setText(to_hex(self.colour))      # not a colour: back to the current one
             return
-        if snap_colour(c, self._bits()) == self.colour:
+        p = self.controller.project
+        if p.system.snap(c) == self.colour:
             self.hex.setText(to_hex(self.colour))          # nothing changed (or snapped to the same colour)
             return
         self._hint = None

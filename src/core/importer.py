@@ -7,7 +7,7 @@ from pathlib import Path
 
 from PIL import Image, UnidentifiedImageError
 
-from .colour import Colour, snap_lut
+from .colour import Colour
 from .rules import MAX_FRAMES, default_label
 from .systems import System
 
@@ -111,7 +111,6 @@ def import_files(paths: list[Path], system: System, width: int, height: int) -> 
         res.rejected = msg_frame_limit(len(ordered))
         return res
 
-    lut = snap_lut(system.bits) * 3
     colours: set[Colour] = set()
     labels: set[str] = set()
 
@@ -136,12 +135,12 @@ def import_files(paths: list[Path], system: System, width: int, height: int) -> 
             res.skipped.append(Skipped(name, msg_unreadable(name)))
             continue
 
-        snapped = rgb.point(lut)                                   # check 4
+        snapped = system.snap_image(rgb)                                 # check 4
         if snapped.tobytes() != rgb.tobytes():
             before = dict.fromkeys(c for _, c in (rgb.getcolors(width * height) or []))
             details = []
             for orig in before:
-                adj = (lut[orig[0]], lut[orig[1]], lut[orig[2]])
+                adj = system.snap(orig)
                 if adj != orig:
                     details.append((orig, adj))
             res.adjustments.append(Adjustment(name, len(details), details))

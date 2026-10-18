@@ -5,7 +5,6 @@ from __future__ import annotations
 from PySide6.QtCore import QObject, QTimer, Signal
 from PySide6.QtWidgets import QWidget
 
-from src.core.colour import snap_colour
 from src.app import messages
 from src.app.edit_session import EditSession
 from src.core import edit, groups, history, palette
@@ -272,7 +271,7 @@ class Controller(QObject):
         """Overwrite palette slot `slot` with `new` (snapped). Asks first if the colour is already in the
         palette, because merging frees a slot."""
         p = self.project
-        if p is None:
+        if p is None or p.system.is_fixed:                  # the colours of a fixed-palette system cannot be changed
             return False
         colours = p.palette()
         if not 0 <= slot < len(colours):
@@ -286,7 +285,7 @@ class Controller(QObject):
             return False
         before = self.checkpoint()
         palette.replace_colour(p, colours[slot], new)
-        self.edit.colour_replaced(colours[slot], snap_colour(new, p.system.bits))
+        self.edit.colour_replaced(colours[slot], p.system.snap(new))
         self.commit(before)
         self.frames_changed.emit()
         return True
