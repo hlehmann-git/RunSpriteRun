@@ -16,6 +16,7 @@ from src.io import settings as settings_io
 class Controller(QObject):
     project_changed = Signal()        # a different project is open (or none)
     selection_changed = Signal(int)   # the selected frame (0-based)
+    multi_changed = Signal()          # Ctrl+click / Shift+click changed the set of selected frames
     frames_changed = Signal()         # frame order, labels or groups changed
     playing_frame = Signal(int)       # frame being shown by a playing view, or -1 when none is playing
     run_frame = Signal(int)           # frame the RunSpriteRun window shows (always: the start state when stopped)
@@ -33,12 +34,13 @@ class Controller(QObject):
         self.settings = settings if settings is not None else settings_io.load()
         self.project: Project | None = None
         self.selected = 0
+        self.multi: set[int] = set()       # more selected frames besides `selected` (the frame clicked first)
         self.parent_widget = parent_widget
         self.runner: Runner | None = None
         self.history = history.History()
         self.edit = EditSession(self)
         self.eyedropper_armed = False      # set by the Colour editor
-        self.frame_clipboard: Frame | None = None    # Ctrl+C in the Timeline: the frame as it was when copied
+        self.clipboard_frames: list[Frame] = []      # Ctrl+C in the Timeline: the frames as they were when copied
         self.timer = QTimer(self)
         self.timer.timeout.connect(self._tick)
         self.frames_changed.connect(self._frames_changed)
@@ -53,6 +55,7 @@ class Controller(QObject):
         self.history_changed.emit()
         self.runner = Runner(project) if project is not None else None
         self.selected = 0
+        self.multi.clear()
         self.project_changed.emit()
         self.run_frame.emit(-1)
         if project is not None:
@@ -68,7 +71,30 @@ class Controller(QObject):
             return
         if index != self.selected:
             self.selected = index
+        self.multi.clear()                                       # a plain click goes back to one frame
         self.selection_changed.emit(index)
+        self.multi_changed.emit()
+
+    @property
+    def frame_clipboard(self) -> Frame | None:
+        """The first copied frame, or None when nothing is copied."""
+        return self.clipboard_frames[0] if self.clipboard_frames else None
+
+    def selection(self) -> list[int]:
+        """Every selected frame, in timeline order."""
+        return sorted({self.selected} | self.multi)
+
+    def select_extra(self, index: int, range_: bool) -> None:
+        """Ctrl+click (add or remove one frame) or Shift+click (the range from the frame clicked first). The frame clicked
+        first stays the main one; nothing happens in Edit mode."""
+        if self.project is None or self.edit.mode or not 0 <= index < len(self.project.frames):
+            return
+        if range_:
+            lo, hi = sorted((self.selected, index))
+            self.multi = set(range(lo, hi + 1)) - {self.selected}
+        elif index != self.selected:
+            self.multi ^= {index}
+        self.multi_changed.emit()
 
     def rename(self, index: int, text: str) -> bool:
         """Returns True if the label was accepted (or unchanged). A refused label shows its message."""
@@ -103,60 +129,100 @@ class Controller(QObject):
         self.selection_changed.emit(dst)
         return True
 
-    # ---- copy and paste a frame in the timeline ------------------------------------------------
+    # ---- copy and paste frames in the timeline -------------------------------------------------
     def copy_frame(self) -> bool:
-        """Ctrl+C in the Timeline: remember the selected frame."""
+        """Ctrl+C in the Timeline: remember the selected frames."""
         if self.project is None or not self.project.frames or self.edit.mode:
             return False
-        f = self.project.frames[self.selected]
-        self.frame_clipboard = Frame(f.label, f.image, layers=f.layers, uid=f.uid)
+        self.clipboard_frames = [Frame(f.label, f.image, layers=f.layers, uid=f.uid)
+                                 for f in (self.project.frames[i] for i in self.selection())]
         return True
 
     def drop_frame_clipboard(self) -> None:
-        self.frame_clipboard = None
+        self.clipboard_frames = []
+
+    def copied_indices(self, srcs: list[Frame] | None = None) -> list[int]:
+        """Where the copied frames are now (those that still exist), in timeline order."""
+        srcs = srcs if srcs is not None else self.clipboard_frames
+        if self.project is None or not srcs:
+            return []
+        wanted = {f.uid for f in srcs}
+        return [i for i, f in enumerate(self.project.frames) if f.uid in wanted]
 
     def copied_index(self, src: Frame | None = None) -> int | None:
-        """Where the copied frame is now, or None when there is nothing copied or the frame is gone."""
-        src = src if src is not None else self.frame_clipboard
-        if self.project is None or src is None:
-            return None
-        for i, f in enumerate(self.project.frames):
-            if f.uid == src.uid:
-                return i
-        return None
+        """Where the (first) copied frame is now, or None when there is nothing copied or the frame is gone."""
+        found = self.copied_indices([src] if src is not None else None)
+        return found[0] if found else None
 
-    def paste_frame(self, after: bool, src: Frame | None = None) -> bool:
-        """Insert a copy of the copied frame (`src`, default: the remembered frame) before or after that frame, as one
-        Undo step. Does nothing if the frame no longer exists."""
-        src = src if src is not None else self.frame_clipboard
-        ref = self.copied_index(src)
-        if self.project is None or src is None or self.edit.mode or ref is None:
+    def paste_frame(self, after: bool, src: Frame | None = None, srcs: list[Frame] | None = None) -> bool:
+        """Insert copies of the copied frames (`srcs`, or `src`, default: the remembered frames) as one block before the
+        first of them or after the last of them, as one Undo step. Does nothing if they no longer exist."""
+        if srcs is None:
+            srcs = [src] if src is not None else self.clipboard_frames
+        found = self.copied_indices(srcs)
+        if self.project is None or self.edit.mode or not found:
             return False
+        current = {f.uid: f for f in self.project.frames}
+        pieces = [Frame(current[f.uid].label, f.image, layers=f.layers) for f in sorted(
+            (f for f in srcs if f.uid in current), key=lambda f: self.project.frames.index(current[f.uid]))]
+        ref = found[-1] if after else found[0]
         self.stop_run()
         before = self.checkpoint()
         try:
-            idx = edit.clone_frame(self.project, src, ref, after)
+            idx = edit.clone_frames(self.project, pieces, ref, after)
         except edit.EditError as e:
             messages.warn(self.parent_widget, str(e))
             return False
         self.commit(before)
         self.selected = idx
+        self.multi.clear()
         self.frames_changed.emit()
         self.selection_changed.emit(idx)
         return True
 
     def clone_frame(self, index: int, after: bool) -> bool:
-        """Right-click Copy before / Copy after: select frame `index` and put a copy of it next to it."""
+        """Right-click Copy before / Copy after: copy the selected frames (or just frame `index` if it is not one of
+        them) next to themselves."""
         if self.project is None or self.edit.mode or not 0 <= index < len(self.project.frames):
             return False
-        self.select(index)
-        f = self.project.frames[index]
-        return self.paste_frame(after, Frame(f.label, f.image, layers=f.layers, uid=f.uid))
+        if index not in self.selection():
+            self.select(index)
+        chosen = [self.project.frames[i] for i in self.selection()]
+        return self.paste_frame(after, srcs=[Frame(f.label, f.image, layers=f.layers, uid=f.uid) for f in chosen])
+
+    # ---- delete frames ---------------------------------------------------------------------------
+    def delete_selected(self) -> bool:
+        """The Delete key in the Timeline: ask, then remove the selected frames (Undo brings them back)."""
+        if self.project is None or self.edit.mode or not self.project.frames:
+            return False
+        idx = self.selection()
+        try:
+            plan = edit.plan_delete(self.project, idx)
+        except edit.EditError as e:
+            messages.warn(self.parent_widget, str(e))
+            return False
+        title = "Delete this frame?" if len(idx) == 1 else f"Delete these {len(idx)} frames?"
+        lines = ["You can undo this."]
+        if plan.emptied:
+            lines.append("Group " + ", ".join(plan.emptied) + " has no frames left and will be deleted.")
+        if plan.resets:
+            lines.append("These rules pointed to what is deleted and will be reset: " + ", ".join(plan.resets) + ".")
+        if not messages.choose(self.parent_widget, title, "\n".join(lines), "Delete", "Cancel"):
+            return False
+        self.stop_run()
+        before = self.checkpoint()
+        edit.delete_frames(self.project, idx)
+        self.commit(before)
+        self.selected = min(idx[0], len(self.project.frames) - 1)
+        self.multi.clear()
+        self.frames_changed.emit()
+        self.selection_changed.emit(self.selected)
+        return True
 
     def move_selected(self, delta: int) -> bool:
         """Ctrl+Left / Ctrl+Right: move the selected frame one place."""
-        if self.project is None:
-            return False
+        if self.project is None or self.multi:
+            return False                                   # several selected frames are not moved
         dst = self.selected + delta
         if not 0 <= dst < len(self.project.frames):
             return False
@@ -370,6 +436,7 @@ class Controller(QObject):
     def _frames_changed(self) -> None:
         """Frames or groups were edited: RunSpriteRun stops (showing the start state); when it was not
         running the window keeps showing the selected frame."""
+        self.multi.clear()                      # frame numbers may have changed: back to one selected frame
         if self.runner is None:
             return
         was_running = self.running

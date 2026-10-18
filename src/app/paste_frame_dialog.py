@@ -3,13 +3,18 @@ from PySide6.QtWidgets import QButtonGroup, QDialog, QDialogButtonBox, QLabel, Q
 
 
 class PasteFrameDialog(QDialog):
-    def __init__(self, parent, copied_number: int, copied_label: str) -> None:
+    def __init__(self, parent, copied_number: int, copied_label: str, count: int = 1, last_number: int | None = None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Paste frame")
+        self.setWindowTitle("Paste frame" if count == 1 else "Paste frames")
         lay = QVBoxLayout(self)
-        lay.addWidget(QLabel(f"Paste a copy of {copied_label}:"))
-        self.before = QRadioButton(f"Before the copied frame ({copied_number})")
-        self.after = QRadioButton(f"After the copied frame ({copied_number})")
+        if count == 1:
+            lay.addWidget(QLabel(f"Paste a copy of {copied_label}:"))
+            self.before = QRadioButton(f"Before the copied frame ({copied_number})")
+            self.after = QRadioButton(f"After the copied frame ({copied_number})")
+        else:
+            lay.addWidget(QLabel(f"Paste a copy of the {count} copied frames:"))
+            self.before = QRadioButton(f"Before the first copied frame ({copied_number})")
+            self.after = QRadioButton(f"After the last copied frame ({last_number})")
         self.after.setChecked(True)
         group = QButtonGroup(self)
         group.addButton(self.before)

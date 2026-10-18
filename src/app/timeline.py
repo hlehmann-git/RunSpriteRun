@@ -32,6 +32,8 @@ SELECTED_BG = QColor(0x3A, 0x42, 0x54)
 NORMAL_BG = QColor(0x1E, 0x1F, 0x24)
 EDITING = QColor(0xFF, 0x98, 0x28)       # border of the frame being edited
 PLAYING = QColor(0xFF, 0xD2, 0x4D)      # border of the frame a playing view is showing
+CHOSEN = QColor(0x4D, 0xA3, 0xFF)       # several frames selected: border and tint of each of them
+CHOSEN_TINT = QColor(0x4D, 0xA3, 0xFF, 70)
 
 
 class Thumb(QWidget):
@@ -51,14 +53,18 @@ class Thumb(QWidget):
         self.selected = False
         self.playing = False
         self.editing = False                 # Edit mode: the frame being edited (orange line inside its group border)
+        self.chosen = False                  # one of several selected frames (tint and blue border)
+        self.main = False                    # ... and the one that was clicked first
+        self.mods = Qt.NoModifier            # keys held at the last press (Ctrl / Shift click)
         self._press: QPoint | None = None
         self._dragging = False
 
     def set_frame(self, image, transparent, border: QColor, selected: bool, playing: bool = False,
-                  editing: bool = False) -> None:
+                  editing: bool = False, chosen: bool = False, main: bool = False) -> None:
         self.image, self.transparent, self.border, self.selected = image, transparent, border, selected
         self.playing = playing
         self.editing = editing
+        self.chosen, self.main = chosen, main
         self.update()
 
     def paintEvent(self, event) -> None:
@@ -81,12 +87,20 @@ class Thumb(QWidget):
         if self.playing:
             p.setPen(QPen(PLAYING, 2))
             p.drawRect(1, 1, BOX_W - 3, BOX_H - 3)
+        if self.chosen:                                   # several frames selected: a tint and a blue border on each
+            p.fillRect(1, 1, BOX_W - 2, BOX_H - 2, CHOSEN_TINT)
+            p.setPen(QPen(CHOSEN, 3))
+            p.drawRect(1, 1, BOX_W - 3, BOX_H - 3)
+            if self.main:                                 # the frame clicked first has a white line inside the blue
+                p.setPen(QPen(QColor(255, 255, 255), 1))
+                p.drawRect(3, 3, BOX_W - 7, BOX_H - 7)
         if self.editing:                                  # the group colour border stays; an orange bar marks this frame
             p.fillRect(1, BOX_H - 6, BOX_W - 2, 5, EDITING)
 
     def mousePressEvent(self, e) -> None:
         if e.button() == Qt.LeftButton:
             self._press, self._dragging = e.position().toPoint(), False
+            self.mods = e.modifiers()
             self.pressed.emit(self.slot)
 
     def contextMenuEvent(self, e) -> None:
@@ -228,6 +242,7 @@ class TimelinePanel(Panel):
         controller.frames_changed.connect(self.refresh)
         controller.edit.changed.connect(self.refresh)
         controller.selection_changed.connect(self._selection_changed)
+        controller.multi_changed.connect(self.refresh)
         controller.playing_frame.connect(self._playing_changed)
         controller.run_frame.connect(self._run_changed)
         controller.run_state.connect(lambda _on: self.refresh())
@@ -283,6 +298,8 @@ class TimelinePanel(Panel):
         self.bar.blockSignals(False)
         groups = group_of_frame(p) if p else []
         colours = {g.name: QColor(*g.colour) for g in p.groups} if p else {}
+        chosen = set(self.controller.selection()) if p else set()
+        many = len(chosen) > 1
         for k, s in enumerate(self.slots):
             i = self.first + k
             s.setVisible(i < n)
@@ -294,7 +311,7 @@ class TimelinePanel(Panel):
             border = colours[g] if g else BORDER                 # always the group's own colour
             s.thumb.set_frame(frame.image, p.transparent, border, i == self.controller.selected,
                              i == self.playing or (self.controller.running and self.controller.runner.animating and i == self.run_index),
-                             e.mode and i == e.idx)
+                             e.mode and i == e.idx, many and i in chosen, i == self.controller.selected)
             s.number.setText(str(i + 1))
             name = name_of(frame.label)
             if s.label.text() != name:
@@ -324,9 +341,24 @@ class TimelinePanel(Panel):
         self.scroll_by(-1 if e.angleDelta().y() > 0 else 1)
 
     # ---- user actions ------------------------------------------------------------------------
+    def _has_focus(self) -> bool:
+        w = QApplication.focusWidget()
+        return w is not None and (w is self or self.isAncestorOf(w))
+
     def _click(self, slot: int) -> None:
+        """A click on a frame. Ctrl+click and Shift+click add to the selection only when this panel already has the
+        focus (a frame was clicked here first); otherwise they act as a plain click."""
+        mods = self.slots[slot].thumb.mods
+        had_focus = self._has_focus()
         self.setFocus(Qt.MouseFocusReason)
-        self.controller.select(self.first + slot)
+        index = self.first + slot
+        c = self.controller
+        if had_focus and not c.edit.mode and mods & Qt.ControlModifier:
+            c.select_extra(index, False)
+        elif had_focus and not c.edit.mode and mods & Qt.ShiftModifier:
+            c.select_extra(index, True)
+        else:
+            c.select(index)
 
     # ---- copy and paste a frame --------------------------------------------------------------
     def _focus_changed(self, old, new) -> None:
@@ -343,18 +375,18 @@ class TimelinePanel(Panel):
 
     def _paste(self) -> None:
         c = self.controller
-        src = c.frame_clipboard
-        ref = c.copied_index()
-        if c.project is None or c.edit.mode or src is None or ref is None:
-            return                                   # nothing copied, or the copied frame is gone: do nothing
-        self._asking = True                          # the question window takes the focus; keep the copied frame
+        found = c.copied_indices()
+        if c.project is None or c.edit.mode or not found:
+            return                                   # nothing copied, or the copied frames are gone: do nothing
+        srcs = list(c.clipboard_frames)
+        self._asking = True                          # the question window takes the focus; keep the copied frames
         try:
-            dlg = PasteFrameDialog(self, ref + 1, c.project.frames[ref].label)
+            dlg = PasteFrameDialog(self, found[0] + 1, c.project.frames[found[0]].label, len(found), found[-1] + 1)
             ok = dlg.exec()
         finally:
             self._asking = False
         if ok:
-            c.paste_frame(dlg.paste_after(), src)
+            c.paste_frame(dlg.paste_after(), srcs=srcs)
 
     def _exec_menu(self, menu: QMenu, pos: QPoint):
         return menu.exec(pos)
@@ -365,7 +397,8 @@ class TimelinePanel(Panel):
         if c.project is None or c.edit.mode or i >= self.frame_count():
             return
         self.setFocus(Qt.MouseFocusReason)
-        c.select(i)
+        if i not in c.selection():
+            c.select(i)                              # a right click inside the selection keeps all of it
         menu = QMenu(self)
         before = menu.addAction("Copy before")
         after = menu.addAction("Copy after")
@@ -396,8 +429,8 @@ class TimelinePanel(Panel):
         return QRect(FIRST_X - 20, THUMB_Y - 8, VISIBLE * PITCH + 40, 220 - THUMB_Y).contains(pos)
 
     def _drag_move(self, slot: int, pos: QPoint) -> None:
-        if self.controller.edit.mode:
-            return                                   # no reordering while editing
+        if self.controller.edit.mode or len(self.controller.selection()) > 1:
+            return                                   # no reordering while editing or with several frames selected
         if self._drag_src is None:
             self._drag_src = self.first + slot
             self.grabKeyboard()
@@ -426,6 +459,10 @@ class TimelinePanel(Panel):
         self.marker.hide()
 
     def keyPressEvent(self, e) -> None:
+        if e.key() == Qt.Key_Delete and self._editing_label() is None and self._drag_src is None:
+            self.controller.delete_selected()        # the Delete key: ask, then remove the selected frames
+            e.accept()
+            return
         if e.key() == Qt.Key_Escape and self._drag_src is not None:
             self._cancel_drag()                      # Esc cancels a drag
             e.accept()

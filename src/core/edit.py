@@ -3,6 +3,7 @@ Pure logic with no UI. Anything that needs the owner's confirmation is passed in
 from __future__ import annotations
 
 from collections import Counter
+from dataclasses import dataclass, field
 from typing import Callable
 
 from .colour import Colour
@@ -12,6 +13,7 @@ from .rules import MAX_FRAMES, MAX_GROUPS, make_label, name_of, old_label_name, 
 
 MSG_LABEL_CHARS = "Names can only use letters, numbers, - and _ (no spaces)."
 MSG_NAME_EMPTY = "A frame needs a name."
+MSG_LAST_FRAME = "A project needs at least one frame."
 
 
 class EditError(ValueError):
@@ -237,3 +239,78 @@ def clone_frame(project: Project, src: Frame, ref: int, after: bool) -> int:
     index = ref + 1 if after else ref
     insert_frame(project, index, frame, join=group_of_frame(project)[ref])
     return index
+
+
+def clone_frames(project: Project, srcs: list[Frame], ref: int, after: bool) -> int:
+    """Timeline Paste of several frames: put copies of `srcs` (in order) as one block just before or after frame `ref` and
+    return the index of the first copy. Each copy keeps its source's name, takes its position number and joins the
+    group of frame `ref`, if it has one. Raises EditError if the block would pass the 120 frame limit."""
+    if len(project.frames) + len(srcs) > MAX_FRAMES:
+        raise EditError(MSG_FRAME_LIMIT)
+    join = group_of_frame(project)[ref]
+    index = ref + 1 if after else ref
+    first = index
+    for k, src in enumerate(srcs):
+        frame = Frame(make_label(name_of(src.label), 0), src.image, layers=src.layers)
+        insert_frame(project, index + k, frame, join=join)
+    return first
+
+
+# ---- delete frames --------------------------------------------------------------------------------------
+@dataclass
+class DeletePlan:
+    emptied: list[str] = field(default_factory=list)     # groups left with no frames, which go too
+    resets: list[str] = field(default_factory=list)      # rules that pointed at deleted frames or groups and are reset
+
+
+def plan_delete(project: Project, indices) -> DeletePlan:
+    """What deleting these frames would do. Raises EditError if nothing valid is chosen or no frame would be left."""
+    gone = set(indices)
+    if not gone or not all(0 <= i < len(project.frames) for i in gone):
+        raise EditError("There are no frames to delete.")
+    if len(gone) >= len(project.frames):
+        raise EditError(MSG_LAST_FRAME)
+    labels = {project.frames[i].label for i in gone}
+    plan = DeletePlan()
+    plan.emptied = [g.name for g in project.groups if all(i in gone for i in range(g.first, g.last + 1))]
+
+    def points_away(rule: Rule | None) -> bool:
+        return rule is not None and ((rule.kind == "frame" and rule.target in labels)
+                                     or (rule.kind == "group" and rule.target in plan.emptied))
+    for g in project.groups:
+        if g.name not in plan.emptied and points_away(g.on_release):
+            plan.resets.append(f"group {g.name} (On Release)")
+    if points_away(project.start_state):
+        plan.resets.append("Start state")
+    return plan
+
+
+def delete_frames(project: Project, indices) -> DeletePlan:
+    """Remove the frames at `indices`. Groups keep their remaining frames, a group with none left is deleted, rules that
+    pointed at what is gone are reset, and every frame is numbered by its position again."""
+    plan = plan_delete(project, indices)
+    gone = set(indices)
+    labels = {project.frames[i].label for i in gone}
+    for g in project.groups:
+        r = g.on_release
+        if r is not None and ((r.kind == "frame" and r.target in labels) or (r.kind == "group" and r.target in plan.emptied)):
+            g.on_release = None
+    s = project.start_state
+    if s is not None and ((s.kind == "frame" and s.target in labels) or (s.kind == "group" and s.target in plan.emptied)):
+        project.start_state = None
+    new_index = {}
+    for i in range(len(project.frames)):
+        if i not in gone:
+            new_index[i] = len(new_index)
+    kept_groups = []
+    for g in project.groups:
+        if g.name in plan.emptied:
+            continue
+        members = [new_index[i] for i in range(g.first, g.last + 1) if i in new_index]
+        g.first, g.last = members[0], members[-1]
+        kept_groups.append(g)
+    project.groups = kept_groups
+    project.frames[:] = [f for i, f in enumerate(project.frames) if i not in gone]
+    renumber(project)
+    project.dirty = True
+    return plan
