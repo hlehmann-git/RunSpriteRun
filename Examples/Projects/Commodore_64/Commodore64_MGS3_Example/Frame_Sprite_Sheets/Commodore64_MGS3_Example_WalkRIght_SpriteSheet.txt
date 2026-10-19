@@ -1,0 +1,23 @@
+Project: Commodore64_MGS3_Example
+System: Commodore 64
+FramesPerSecond: 12
+FrameSize: 56 x 64
+SheetFile: Commodore64_MGS3_Example_WalkRIght_SpriteSheet.png
+SheetSize: 640 x 205
+Number, Label, Group, X, Y, Width, Height
+1, Atari_ST_MetalGearSolid3_example_SpriteSheet_001, WalkRIght, 1, 63, 56, 64
+2, Atari_ST_MetalGearSolid3_example_SpriteSheet_002, WalkRIght, 58, 63, 56, 64
+3, Atari_ST_MetalGearSolid3_example_SpriteSheet_003, WalkRIght, 115, 63, 56, 64
+4, Atari_ST_MetalGearSolid3_example_SpriteSheet_004, WalkRIght, 172, 63, 56, 64
+5, Atari_ST_MetalGearSolid3_example_SpriteSheet_005, WalkRIght, 229, 63, 56, 64
+6, Atari_ST_MetalGearSolid3_example_SpriteSheet_006, WalkRIght, 286, 63, 56, 64
+7, Atari_ST_MetalGearSolid3_example_SpriteSheet_007, WalkRIght, 343, 63, 56, 64
+8, Atari_ST_MetalGearSolid3_example_SpriteSheet_008, WalkRIght, 400, 63, 56, 64
+9, Atari_ST_MetalGearSolid3_example_SpriteSheet_009, WalkRIght, 457, 63, 56, 64
+10, Atari_ST_MetalGearSolid3_example_SpriteSheet_010, WalkRIght, 514, 63, 56, 64
+11, Atari_ST_MetalGearSolid3_example_SpriteSheet_011, WalkRIght, 1, 128, 56, 64
+12, Atari_ST_MetalGearSolid3_example_SpriteSheet_012, WalkRIght, 58, 128, 56, 64
+13, Atari_ST_MetalGearSolid3_example_SpriteSheet_013, WalkRIght, 115, 128, 56, 64
+14, Atari_ST_MetalGearSolid3_example_SpriteSheet_014, WalkRIght, 172, 128, 56, 64
+15, Atari_ST_MetalGearSolid3_example_SpriteSheet_015, WalkRIght, 229, 128, 56, 64
+16, Atari_ST_MetalGearSolid3_example_SpriteSheet_016, WalkRIght, 286, 128, 56, 64

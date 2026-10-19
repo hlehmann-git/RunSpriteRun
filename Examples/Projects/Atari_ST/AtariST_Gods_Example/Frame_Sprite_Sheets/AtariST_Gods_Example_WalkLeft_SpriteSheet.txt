@@ -1,0 +1,15 @@
+Project: AtariST_Gods_Example
+System: Atari ST
+FramesPerSecond: 12
+FrameSize: 35 x 53
+SheetFile: AtariST_Gods_Example_WalkLeft_SpriteSheet.png
+SheetSize: 640 x 129
+Number, Label, Group, X, Y, Width, Height
+1, GODS_Short_SpriteSheet_001, WalkLeft, 1, 63, 35, 53
+2, GODS_Short_SpriteSheet_002, WalkLeft, 37, 63, 35, 53
+3, GODS_Short_SpriteSheet_003, WalkLeft, 73, 63, 35, 53
+4, GODS_Short_SpriteSheet_004, WalkLeft, 109, 63, 35, 53
+5, GODS_Short_SpriteSheet_005, WalkLeft, 145, 63, 35, 53
+6, GODS_Short_SpriteSheet_006, WalkLeft, 181, 63, 35, 53
+7, GODS_Short_SpriteSheet_007, WalkLeft, 217, 63, 35, 53
+8, GODS_Short_SpriteSheet_008, WalkLeft, 253, 63, 35, 53

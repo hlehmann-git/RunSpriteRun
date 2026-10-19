@@ -1,0 +1,23 @@
+Project: Commodore64_Gods_Example
+System: Commodore 64
+FramesPerSecond: 12
+FrameSize: 35 x 53
+SheetFile: Commodore64_Gods_Example_SpriteSheet.png
+SheetSize: 640 x 183
+Number, Label, Group, X, Y, Width, Height
+1, SegaMegaDrive_SpriteSheet_001, WalkLeft, 1, 63, 35, 53
+2, SegaMegaDrive_SpriteSheet_002, WalkLeft, 37, 63, 35, 53
+3, SegaMegaDrive_SpriteSheet_003, WalkLeft, 73, 63, 35, 53
+4, SegaMegaDrive_SpriteSheet_004, WalkLeft, 109, 63, 35, 53
+5, SegaMegaDrive_SpriteSheet_005, WalkLeft, 145, 63, 35, 53
+6, SegaMegaDrive_SpriteSheet_006, WalkLeft, 181, 63, 35, 53
+7, SegaMegaDrive_SpriteSheet_007, WalkLeft, 217, 63, 35, 53
+8, SegaMegaDrive_SpriteSheet_008, WalkLeft, 253, 63, 35, 53
+9, SegaMegaDrive_SpriteSheet_009, , 289, 63, 35, 53
+10, SegaMegaDrive_SpriteSheet_010, , 325, 63, 35, 53
+11, SegaMegaDrive_SpriteSheet_011, , 1, 117, 35, 53
+12, SegaMegaDrive_SpriteSheet_012, , 37, 117, 35, 53
+13, SegaMegaDrive_SpriteSheet_013, , 73, 117, 35, 53
+14, SegaMegaDrive_SpriteSheet_014, , 109, 117, 35, 53
+15, SegaMegaDrive_SpriteSheet_015, , 145, 117, 35, 53
+16, SegaMegaDrive_SpriteSheet_016, , 181, 117, 35, 53

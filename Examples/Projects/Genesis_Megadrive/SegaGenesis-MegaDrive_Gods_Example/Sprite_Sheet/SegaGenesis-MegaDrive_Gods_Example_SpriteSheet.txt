@@ -1,0 +1,23 @@
+Project: SegaGenesis-MegaDrive_Gods_Example
+System: Sega Genesis / Mega Drive
+FramesPerSecond: 12
+FrameSize: 35 x 53
+SheetFile: SegaGenesis-MegaDrive_Gods_Example_SpriteSheet.png
+SheetSize: 640 x 183
+Number, Label, Group, X, Y, Width, Height
+1, GODS_Hercules_SpriteSheet_TestForAllSystems_001, , 1, 63, 35, 53
+2, GODS_Hercules_SpriteSheet_TestForAllSystems_002, , 37, 63, 35, 53
+3, GODS_Hercules_SpriteSheet_TestForAllSystems_003, , 73, 63, 35, 53
+4, GODS_Hercules_SpriteSheet_TestForAllSystems_004, , 109, 63, 35, 53
+5, GODS_Hercules_SpriteSheet_TestForAllSystems_005, , 145, 63, 35, 53
+6, GODS_Hercules_SpriteSheet_TestForAllSystems_006, , 181, 63, 35, 53
+7, GODS_Hercules_SpriteSheet_TestForAllSystems_007, , 217, 63, 35, 53
+8, GODS_Hercules_SpriteSheet_TestForAllSystems_008, , 253, 63, 35, 53
+9, GODS_Hercules_SpriteSheet_TestForAllSystems_009, , 289, 63, 35, 53
+10, GODS_Hercules_SpriteSheet_TestForAllSystems_010, , 325, 63, 35, 53
+11, GODS_Hercules_SpriteSheet_TestForAllSystems_011, , 1, 117, 35, 53
+12, GODS_Hercules_SpriteSheet_TestForAllSystems_012, , 37, 117, 35, 53
+13, GODS_Hercules_SpriteSheet_TestForAllSystems_013, , 73, 117, 35, 53
+14, GODS_Hercules_SpriteSheet_TestForAllSystems_014, , 109, 117, 35, 53
+15, GODS_Hercules_SpriteSheet_TestForAllSystems_015, , 145, 117, 35, 53
+16, GODS_Hercules_SpriteSheet_TestForAllSystems_016, , 181, 117, 35, 53
