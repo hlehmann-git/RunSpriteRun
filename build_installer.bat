@@ -1,6 +1,6 @@
 @echo off
 rem Builds the RunSpriteRun Windows installer on this PC.
-rem Needs: the .venv folder set up (see BUILD_INSTALLER.txt) and Inno Setup 6 installed.
+rem Needs: the .venv folder set up (see docs/BUILDING.md) and Inno Setup 6 installed.
 setlocal
 cd /d "%~dp0"
 title Build the RunSpriteRun installer
@@ -13,7 +13,7 @@ echo.
 
 if not exist "%PY%" (
   echo The .venv folder was not found in this folder.
-  echo Set it up first: see Part 4 in BUILD_INSTALLER.txt.
+  echo Set it up first: see step 4 in docs\BUILDING.md.
   goto :fail
 )
 
