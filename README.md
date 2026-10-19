@@ -42,7 +42,7 @@ Shrink Sprite and Reduce Palette cannot be undone. Both warn you first, and noth
 
 The program needs Windows 10 or 11 (64-bit). The installer includes everything it needs, so you do not need Python.
 
-1. Get `RunSpriteRun_Setup_<version>.exe` from the author.
+1. Download the latest `RunSpriteRun_Setup_<version>.exe` from the [Releases page](https://github.com/hlehmann-git/RunSpriteRun/releases/latest) (under **Assets**).
 2. Double-click it. Windows may show "Windows protected your PC", because the installer is not signed. Click **More info**, then **Run anyway**.
 3. Choose where to install it, then click **Install**.
 
