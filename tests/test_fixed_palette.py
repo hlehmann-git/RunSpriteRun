@@ -42,8 +42,15 @@ def test_the_two_systems_have_sixteen_distinct_colours():
         assert s.default_transparent in colours
     assert C64.default_transparent == (0x6C, 0x5E, 0xB5)           # light blue, rarely needed
     assert APPLE.default_transparent == (0, 0, 0x99)               # dark blue
-    assert [s.name for s in SYSTEMS][-2:] == ["Commodore 64", "Apple II (Double Hi-Res)"]
+    assert [s.name for s in SYSTEMS][-3:] == ["Commodore 64", "Apple II (Double Hi-Res)", "Apple IIgs"]
     assert not get_system("Amiga").is_fixed
+
+
+def test_apple_iigs_is_a_normal_rgb_system_with_16_colours():
+    g = get_system("Apple IIgs")
+    assert not g.is_fixed and g.bits == 4 and g.max_colours == 16 and g.total_colours == 4096 == g.levels ** 3
+    assert g.snap((250, 3, 7)) == (255, 0, 0) and g.valid((17, 34, 51)) and not g.valid((18, 34, 51))
+    assert g.depth_label == "12-bit (RGB 4:4:4)"
 
 
 def test_snap_picks_the_nearest_fixed_colour():

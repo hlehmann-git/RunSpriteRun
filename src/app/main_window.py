@@ -27,6 +27,8 @@ from src.core.project import Project
 from src.core.rules import valid_project_name
 from src.app.info_dialogs import AboutDialog, HelpDialog, ProjectInformationDialog
 from src.app.settings_dialog import SettingsDialog
+from src.app.shrink_dialog import WARNING, ShrinkDialog
+from src.core.shrink import new_size, percent_label, shrink_project
 from src.app.blank_sheet_dialog import BlankSheetDialog
 from src.app.export_dialog import ExportDialog
 from src.io import paths
@@ -160,6 +162,8 @@ class MainWindow(QMainWindow):
         self.act_exit = a(self.menu_file, "Exit")
         self.act_undo = a(self.menu_edit, "Undo", "Ctrl+Z")
         self.act_redo = a(self.menu_edit, "Redo", "Ctrl+Y")
+        self.menu_edit.addSeparator()
+        self.act_shrink = a(self.menu_edit, "Shrink Sprite")
         self.act_new_group = a(self.menu_group, "New Group", "Ctrl+G")
         self.act_delete_group = a(self.menu_group, "Delete Group")
         self.act_help = a(self.menu_help, "RunSpriteRun Help (F1)", "F1")
@@ -169,6 +173,7 @@ class MainWindow(QMainWindow):
         self.act_delete_group.triggered.connect(self.delete_group)
         self.act_undo.triggered.connect(lambda: self.controller.edit.undo() if self.controller.edit.mode else self.controller.undo())
         self.act_redo.triggered.connect(lambda: self.controller.edit.redo() if self.controller.edit.mode else self.controller.redo())
+        self.act_shrink.triggered.connect(self.shrink_sprite)
         self.act_new.triggered.connect(self.new_project)
         self.act_open.triggered.connect(self.open_project_dialog)
         self.act_save.triggered.connect(self.save)
@@ -375,6 +380,32 @@ class MainWindow(QMainWindow):
     def show_blank_sheet(self) -> None:
         BlankSheetDialog(self).exec()          # needs no project (FR-4.9)
 
+    def shrink_sprite(self) -> None:
+        """Edit > Shrink Sprite: ask how small, ask again, then shrink every frame. It cannot be undone, so the Undo
+        history is cleared; the project counts as unsaved."""
+        c = self.controller
+        p = c.project
+        if p is None or c.edit.mode or not p.frames:
+            return
+        dlg = ShrinkDialog(self, p.width, p.height)
+        if not dlg.exec():
+            return
+        pct = dlg.percent()
+        w, h = new_size(p.width, p.height, pct)
+        if not messages.choose(self, f"Shrink every frame to {percent_label(pct)} of its size ({w} x {h} pixels)?",
+                               WARNING, "Shrink", "Cancel"):
+            return
+        selected = c.selected
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        try:
+            shrink_project(p, pct)
+        finally:
+            QApplication.restoreOverrideCursor()
+        self.set_project(p)                              # every panel follows the new size; the Undo history starts again
+        c.select(min(selected, len(p.frames) - 1))
+        p.dirty = True
+        self._update_save_action()
+
     def show_settings(self) -> None:
         if self.controller.project is not None:
             SettingsDialog(self).exec()
@@ -419,6 +450,8 @@ class MainWindow(QMainWindow):
         e = self.controller.edit
         self.act_undo.setEnabled(e.can_undo if e.mode else self.controller.can_undo)
         self.act_redo.setEnabled(e.can_redo if e.mode else self.controller.can_redo)
+        p = self.controller.project
+        self.act_shrink.setEnabled(p is not None and bool(p.frames) and not e.mode)    # not while editing
 
     # ---- Group menu ----------------------------------------------------------------------------
     def _update_group_actions(self) -> None:

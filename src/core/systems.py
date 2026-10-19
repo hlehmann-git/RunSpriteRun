@@ -72,6 +72,7 @@ SYSTEMS: tuple[System, ...] = (
     System("Amiga", 32, 4, "12-bit (RGB 4:4:4)", 4096),
     System("Commodore 64", 16, 8, "16 fixed colours", 16, C64_COLOURS, C64_COLOURS[14]),                 # light blue: rarely needed
     System("Apple II (Double Hi-Res)", 16, 8, "16 fixed colours", 16, APPLE2_COLOURS, APPLE2_COLOURS[2]),   # dark blue: rarely needed
+    System("Apple IIgs", 16, 4, "12-bit (RGB 4:4:4)", 4096),
 )
 
 _BY_NAME = {s.name: s for s in SYSTEMS}

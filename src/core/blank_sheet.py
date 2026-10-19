@@ -28,6 +28,7 @@ FOLDER_NAMES = {
     "Amiga": "Amiga",
     "Commodore 64": "Commodore_64",
     "Apple II (Double Hi-Res)": "Apple_II_DoubleHiRes",
+    "Apple IIgs": "Apple_IIgs",
 }
 
 MSG_TOO_MANY = "A blank sprite sheet can hold at most 120 sprites and be 2,048 pixels wide."
