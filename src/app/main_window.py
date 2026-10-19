@@ -28,6 +28,8 @@ from src.core.rules import valid_project_name
 from src.app.info_dialogs import AboutDialog, HelpDialog, ProjectInformationDialog
 from src.app.settings_dialog import SettingsDialog
 from src.app.shrink_dialog import WARNING, ShrinkDialog
+from src.app.reduce_dialog import ReduceDialog
+from src.core.reduce_palette import can_reduce, colour_count, reduce_project
 from src.core.shrink import new_size, percent_label, shrink_project
 from src.app.blank_sheet_dialog import BlankSheetDialog
 from src.app.export_dialog import ExportDialog
@@ -164,6 +166,7 @@ class MainWindow(QMainWindow):
         self.act_redo = a(self.menu_edit, "Redo", "Ctrl+Y")
         self.menu_edit.addSeparator()
         self.act_shrink = a(self.menu_edit, "Shrink Sprite")
+        self.act_reduce = a(self.menu_edit, "Reduce Palette")
         self.act_new_group = a(self.menu_group, "New Group", "Ctrl+G")
         self.act_delete_group = a(self.menu_group, "Delete Group")
         self.act_help = a(self.menu_help, "RunSpriteRun Help (F1)", "F1")
@@ -174,6 +177,7 @@ class MainWindow(QMainWindow):
         self.act_undo.triggered.connect(lambda: self.controller.edit.undo() if self.controller.edit.mode else self.controller.undo())
         self.act_redo.triggered.connect(lambda: self.controller.edit.redo() if self.controller.edit.mode else self.controller.redo())
         self.act_shrink.triggered.connect(self.shrink_sprite)
+        self.act_reduce.triggered.connect(self.reduce_palette)
         self.act_new.triggered.connect(self.new_project)
         self.act_open.triggered.connect(self.open_project_dialog)
         self.act_save.triggered.connect(self.save)
@@ -406,6 +410,27 @@ class MainWindow(QMainWindow):
         p.dirty = True
         self._update_save_action()
 
+    def reduce_palette(self) -> None:
+        """Edit > Reduce Palette: choose the number of colours (with a From / To preview), ask again, then reduce every
+        frame. It cannot be undone, so the Undo history is cleared; the project counts as unsaved."""
+        c = self.controller
+        p = c.project
+        if p is None or c.edit.mode or not p.frames or p.system.is_fixed or not can_reduce(p):
+            return
+        dlg = ReduceDialog(self, p, c.selected)
+        if not dlg.exec():
+            return
+        keep = dlg.keep()
+        if not messages.choose(self, f"Reduce the project from {colour_count(p)} to {keep} colours?", WARNING,
+                               "Reduce", "Cancel"):
+            return
+        selected = c.selected
+        reduce_project(p, keep)
+        self.set_project(p)                              # every panel follows the new palette; the Undo history starts again
+        c.select(min(selected, len(p.frames) - 1))
+        p.dirty = True
+        self._update_save_action()
+
     def show_settings(self) -> None:
         if self.controller.project is not None:
             SettingsDialog(self).exec()
@@ -452,6 +477,8 @@ class MainWindow(QMainWindow):
         self.act_redo.setEnabled(e.can_redo if e.mode else self.controller.can_redo)
         p = self.controller.project
         self.act_shrink.setEnabled(p is not None and bool(p.frames) and not e.mode)    # not while editing
+        self.act_reduce.setEnabled(p is not None and bool(p.frames) and not e.mode and not p.system.is_fixed
+                                   and can_reduce(p))
 
     # ---- Group menu ----------------------------------------------------------------------------
     def _update_group_actions(self) -> None:

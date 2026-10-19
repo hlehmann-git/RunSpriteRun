@@ -219,7 +219,7 @@ def test_information_rows_follow_prd(win):
 def test_help_and_about_text(win):
     assert len(HelpDialog(win).text.toPlainText().splitlines()) == 10
     a = AboutDialog(win)
-    assert a.author.text() == "by Harley Lehmann" and a.version.text() == "Version 2.0.4"
+    assert a.author.text() == "by Harley Lehmann" and a.version.text() == "Version 2.0.6"
     assert "5649" in a.comments.text() and not a.picture.pixmap().isNull()
     assert a.picture.pixmap().width() == 480
     assert "Deluxe Paint" in a.description.text() and "Buddy Claude" in a.small_print.text()
@@ -307,3 +307,15 @@ def test_projects_folder_and_dialog_start_folders(win, tmp_path, monkeypatch):
 def test_image_browse_starts_in_home(app, tmp_path):
     from src.app.start_project import StartProjectDialog
     assert StartProjectDialog()._folder == str(tmp_path / "home")
+
+
+def test_save_as_dialog_warns_about_long_or_bad_names(app):
+    from src.app.save_as_dialog import SaveAsDialog
+    d = SaveAsDialog(None, "Good_name", "C:/x")
+    assert "9 of 40 characters" in d.name_hint.text() and d.ok.isEnabled()
+    d.name.setText("A" * 41)
+    assert "Too long" in d.name_hint.text() and "41 of 40" in d.name_hint.text() and not d.ok.isEnabled()
+    d.name.setText("has space")
+    assert "letters, numbers" in d.name_hint.text().lower() and not d.ok.isEnabled()
+    d.name.setText("A" * 40)
+    assert d.ok.isEnabled()
