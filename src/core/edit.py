@@ -100,7 +100,7 @@ def _drop_control_rules(project: Project, gone_groups: set[str], reset: list[str
     from .rules import keys_text
     keep = []
     for cr in project.control_rules:
-        if cr.group in gone_groups:
+        if cr.group in gone_groups or (cr.from_group and cr.from_group in gone_groups):
             continue
         r = cr.release
         if r is not None and ((r.kind == "group" and r.target in gone_groups) or (r.kind == "frame" and r.target in gone_labels)):
@@ -309,7 +309,7 @@ def plan_delete(project: Project, indices) -> DeletePlan:
         if g.name not in plan.emptied and points_away(g.on_release):
             plan.resets.append(f"group {g.name} (On Release)")
     for cr in project.control_rules:
-        if cr.group in plan.emptied:
+        if cr.group in plan.emptied or (cr.from_group and cr.from_group in plan.emptied):
             plan.resets.append(f"rule {_kt(cr.keys)} (Frame Group Control)")
         elif points_away(cr.release):
             plan.resets.append(f"rule {_kt(cr.keys)} (When released)")

@@ -71,7 +71,8 @@ def save_project(project: Project, path: str | Path) -> None:
                     "on_release": _rule_to_json(g.on_release), "colour": list(g.colour)}
                    for g in project.groups],
         "start_state": _rule_to_json(project.start_state),
-        "control_rules": [{"keys": list(r.keys), "group": r.group, "once": r.once, "release": _rule_to_json(r.release)}
+        "control_rules": [{"keys": list(r.keys), "group": r.group, "once": r.once, "release": _rule_to_json(r.release),
+                           "from_group": r.from_group}
                           for r in project.control_rules],          # Frame Group Control rules, top rule first
         "labels": "numbered",          # labels are name_NNN (NNN = position); files without this are converted on opening
     }
@@ -194,8 +195,10 @@ def open_project(path: str | Path) -> Project:
                 try:
                     keys = [k for k in d["keys"]]
                     if (keys and all(isinstance(k, str) and k in ("W", "A", "S", "D", "1", "2", "3", "4", "5", "6") for k in keys)
-                            and len(set(keys)) == len(keys) and d["group"] in names):
-                        control.append(ControlRule(keys, d["group"], bool(d.get("once", False)), _rule_from_json(d.get("release"))))
+                            and len(set(keys)) == len(keys) and d["group"] in names
+                            and (not d.get("from_group") or d["from_group"] in names)):
+                        control.append(ControlRule(keys, d["group"], bool(d.get("once", False)), _rule_from_json(d.get("release")),
+                                                   str(d.get("from_group") or "")))
                 except (KeyError, TypeError, ValueError):
                     continue
             project = Project(name=name, system=system, width=w, height=h, fps=fps,

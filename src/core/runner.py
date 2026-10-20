@@ -94,12 +94,20 @@ class Runner:
     def _group_named(self, name: str):
         return next((g for g in self.project.groups if g.name == name), None)
 
+    def showing_group(self) -> str | None:
+        """The group the frame on screen belongs to (frames in no group: None)."""
+        return next((g.name for g in self.project.groups if g.first <= self.frame <= g.last), None)
+
     def _wanted(self) -> tuple | None:
         """What should play now. The Frame Group Control rules come first, top rule first: the first one whose keys are
         all held (and that has not just finished playing once) wins. Then the basic key of a group."""
         held = set(self.held)
+        showing = self.showing_group()
         for i, r in enumerate(self.project.control_rules):
             if i not in self._done and r.keys and set(r.keys) <= held and self._group_named(r.group) is not None:
+                # "only when showing": the rule that is already playing keeps going even though its own frames are now on screen
+                if r.from_group and r.from_group != showing and ("rule", i) != self._current:
+                    continue
                 return ("rule", i)
         key = self.effective_key()
         return ("key", key) if key is not None else None

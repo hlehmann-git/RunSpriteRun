@@ -27,8 +27,8 @@ def test_rule_rows_order_and_content():
 def test_text_is_tab_separated_tables():
     t = rules_export.rules_text(proj())
     lines = t.splitlines()
-    assert lines[2].split("\t") == ["Priority", "Source", "Keys", "Plays", "Mode", "When released"]
-    assert lines[3].split("\t") == ["1", "Frame Group Control", "W+D+1", "Shoot", "Play once", "Go To Frame Walk_001"]
+    assert lines[2].split("\t") == ["Priority", "Source", "Keys", "Only after", "Plays", "Mode", "When released"]
+    assert lines[3].split("\t") == ["1", "Frame Group Control", "W+D+1", "", "Shoot", "Play once", "Go To Frame Walk_001"]
     assert "WalkRight\t3\t5\t3\tWalk_003\tWalk_005\tD\tDemo_WalkRight_SpriteSheet.png" in t
 
 

@@ -14,6 +14,7 @@ SUFFIX_TXT = "_Rules.txt"
 SUFFIX_JSON = "_Rules.json"
 HOW_TO_READ = [
     "Rules are checked from priority 1 downwards while the player holds keys; the first rule whose keys are all held plays its group.",
+    "only_after: when a group name is given, the rule only fires while the frame on screen belongs to that group (for example a turn that plays only after the walk in the other direction). null means always.",
     "Rules from frame_group_control come first. After them come the keys given to a group in Set Frame Group (source group_key): "
     "a diagonal such as W+D beats a single key, otherwise the key pressed last wins.",
     "mode loop: the group repeats while the keys are held. mode play_once: it plays through one time, will not fire again until "
@@ -48,11 +49,11 @@ def rule_rows(project: Project) -> list[dict]:
             continue
         release = cr.release if cr.release is not None else g.on_release
         rows.append({"source": "frame_group_control", "keys": sorted(cr.keys, key="WASD123456".index),
-                     "plays": cr.group, "mode": "play_once" if cr.once else "loop", "when_released": release})
+                     "only_after": cr.from_group or None, "plays": cr.group, "mode": "play_once" if cr.once else "loop", "when_released": release})
     keyed = [g for g in project.groups if g.key]
     keyed.sort(key=lambda g: 0 if g.key in DIAGONALS else 1)                       # a diagonal beats a single key
     for g in keyed:
-        rows.append({"source": "group_key", "keys": g.key.split("+"), "plays": g.name, "mode": "loop", "when_released": g.on_release})
+        rows.append({"source": "group_key", "keys": g.key.split("+"), "only_after": None, "plays": g.name, "mode": "loop", "when_released": g.on_release})
     return rows
 
 
@@ -81,7 +82,7 @@ def rules_json(project: Project) -> str:
         "controller": {"directions": ["W", "A", "S", "D"], "diagonals": list(DIAGONALS), "buttons": [k for k in keys if k.isdigit()]},
         "start_state": _release_json(project.start_state),
         "groups": group_rows(project),
-        "rules": [{"priority": i + 1, "source": r["source"], "keys": r["keys"], "plays": r["plays"], "mode": r["mode"],
+        "rules": [{"priority": i + 1, "source": r["source"], "keys": r["keys"], "only_after": r["only_after"], "plays": r["plays"], "mode": r["mode"],
                    "when_released": _release_json(r["when_released"])} for i, r in enumerate(rule_rows(project))],
     }
     return json.dumps(doc, indent=2, ensure_ascii=False) + "\n"
@@ -90,11 +91,11 @@ def rules_json(project: Project) -> str:
 def rules_text(project: Project) -> str:
     """Tab-separated: a rules table, a blank line, then a groups table."""
     lines = [f"RunSpriteRun rules\t{project.name}\t{project.system.name}\t{project.fps} fps\t{project.width} x {project.height}", "",
-             "Priority\tSource\tKeys\tPlays\tMode\tWhen released"]
+             "Priority\tSource\tKeys\tOnly after\tPlays\tMode\tWhen released"]
     for i, r in enumerate(rule_rows(project)):
         src = "Frame Group Control" if r["source"] == "frame_group_control" else "Group key"
         mode = "Play once" if r["mode"] == "play_once" else "Loop"
-        lines.append(f"{i + 1}\t{src}\t{'+'.join(r['keys'])}\t{r['plays']}\t{mode}\t{_release_text(r['when_released'])}")
+        lines.append(f"{i + 1}\t{src}\t{'+'.join(r['keys'])}\t{r['only_after'] or ''}\t{r['plays']}\t{mode}\t{_release_text(r['when_released'])}")
     lines += ["", "Group\tFirst frame\tLast frame\tFrames\tFirst label\tLast label\tKey\tSprite sheet"]
     for g in group_rows(project):
         lines.append(f"{g['name']}\t{g['first_frame']}\t{g['last_frame']}\t{g['frame_count']}\t{g['first_label']}\t"

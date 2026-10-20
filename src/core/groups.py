@@ -95,6 +95,8 @@ def save_group(project: Project, editing: str | None, name: str, first: int, las
             for cr in project.control_rules:
                 if cr.group == editing:
                     cr.group = name
+                if cr.from_group == editing:
+                    cr.from_group = name
         group.name, group.first, group.last = name, first, last
         group.key, group.on_release, group.colour = key, on_release, colour
         if on_release is not None and on_release.kind == "group" and on_release.target == editing:
@@ -126,6 +128,8 @@ def rules_pointing_to(project: Project, name: str) -> list[str]:
            if g.name != name                       # the deleted group's own rule goes with it
            and g.on_release is not None and g.on_release.kind == "group" and g.on_release.target == name]
     out += [f"rule {keys_text(cr.keys)} (Frame Group Control)" for cr in project.control_rules if cr.group == name]
+    out += [f"rule {keys_text(cr.keys)} (Only after)" for cr in project.control_rules
+            if cr.group != name and cr.from_group == name]
     out += [f"rule {keys_text(cr.keys)} (When released)" for cr in project.control_rules
             if cr.group != name and cr.release is not None and cr.release.kind == "group" and cr.release.target == name]
     if project.start_state is not None and project.start_state.kind == "group" and project.start_state.target == name:
@@ -145,6 +149,8 @@ def check_control_rule(project: Project, rule: ControlRule) -> None:
     if any(k not in ("W", "A", "S", "D", "1", "2", "3", "4", "5", "6") for k in rule.keys) or len(set(rule.keys)) != len(rule.keys):
         raise GroupError("Unknown key.")
     if find_group(project, rule.group) is None:
+        raise GroupError(MSG_RULE_NO_GROUP)
+    if rule.from_group and find_group(project, rule.from_group) is None:
         raise GroupError(MSG_RULE_NO_GROUP)
 
 

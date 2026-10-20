@@ -38,6 +38,7 @@ class ControlRule:
     group: str                         # the group that plays
     once: bool = False                 # True: play through one time, then hand over; False: loop while the keys are held
     release: Rule | None = None        # when all keys are let go (or a play-once ends with nothing held): None = the group's On Release
+    from_group: str = ""               # "" = always; otherwise the rule only fires while the frame on screen belongs to this group
 
 
 _uids = itertools.count(1)

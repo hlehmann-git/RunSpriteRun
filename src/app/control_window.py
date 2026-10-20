@@ -243,6 +243,7 @@ class ControlWindow(QDialog):
 
     def rebuild(self) -> None:
         self._rc: dict[int, ReleaseChoice] = {}
+        self._from: dict[int, QComboBox] = {}
         self._key_rc: dict[str, ReleaseChoice] = {}
         while self.rows.count():
             item = self.rows.takeAt(0)
@@ -331,6 +332,26 @@ class ControlWindow(QDialog):
             b.clicked.connect(fn)
             line.addWidget(b)
         v.addLayout(line)
+        cond = QHBoxLayout()
+        clab = QLabel("Only after:")
+        clab.setStyleSheet(GREY)
+        cond.addWidget(clab)
+        frm = QComboBox()
+        short_popup(frm)
+        frm.addItem("Any frame", "")
+        for g in p.groups:
+            frm.addItem(g.name, g.name)
+        frm.setCurrentIndex(max(0, frm.findData(r.from_group)))
+        frm.setToolTip("The rule only fires if Hercules, or whatever is on screen, is currently in this group. "
+                       "Use it for turns: play TurnLeft only after WalkRight.")
+        frm.currentIndexChanged.connect(lambda _x, i=i, c=frm: self._edit(i, from_group=c.currentData()))
+        self._from[i] = frm
+        cond.addWidget(frm)
+        hint = QLabel("e.g. play TurnLeft only after WalkRight (the frame on screen is in that group)")
+        hint.setStyleSheet(GREY)
+        cond.addWidget(hint)
+        cond.addStretch(1)
+        v.addLayout(cond)
         second = QHBoxLayout()
         lab = QLabel("When all keys are released:")
         lab.setStyleSheet(GREY)
