@@ -1,7 +1,7 @@
 """Set Frame Group panel (FR-3.11): create, edit and rename a group. Nothing changes until Apply."""
 from __future__ import annotations
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QColorDialog, QComboBox, QFrame, QLabel, QLineEdit, QPushButton, QSpinBox, QWidget
 
@@ -13,7 +13,7 @@ from src.app.rule_editor import RuleEditor
 from src.app.sprite_view import SpriteView
 from src.core import edit, groups
 from src.core.project import Rule
-from src.core.rules import GROUP_NAME_MAX, KEY_LABELS, KEYS, MAX_GROUPS
+from src.core.rules import GROUP_NAME_MAX, KEY_LABELS, KEYS, MAX_GROUPS, keys_text
 
 NEW_GROUP = "New group"
 GREY = "color: #9aa0ae;"
@@ -25,6 +25,7 @@ APPLY_STYLE = ("QPushButton { background: #3780cd; border: 1px solid #78b9ff; bo
 
 class SetFrameGroupPanel(Panel):
     current_group_changed = Signal(object)        # name of the group being edited, or None for a new one
+    set_rules_requested = Signal()                # the Set Rules button: open the Frame Group Control window
 
     def __init__(self, parent: QWidget, controller: Controller) -> None:
         super().__init__("Set Frame Group", parent)
@@ -67,7 +68,20 @@ class SetFrameGroupPanel(Panel):
         self.to_box.move(183, 156)
         self.to_view.move(235, 151)
 
-        self._heading("ON HOLD KEY", 299, 50)
+        # v2.0.9: the keys that play a group are set in the Frame Group Control window (Set Rules). The old key and release
+        # controls stay as hidden holders of the group's values, so Apply keeps them unchanged.
+        self._hidden = QWidget(self)
+        self._hidden.hide()
+        self._heading_rules = self._heading("RULES", 299, 50)
+        self.rules_text = QLabel(self)
+        self.rules_text.setTextFormat(Qt.RichText)
+        self.rules_text.setWordWrap(True)
+        self.rules_text.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+        self.rules_text.setStyleSheet("color: #c9ccd6; font-size: 12px;")
+        self.rules_text.setGeometry(299, 68, 225, 100)
+        self.rules_btn = QPushButton("Set Rules", self)
+        self.rules_btn.setGeometry(299, 175, 120, 26)
+        self.rules_btn.clicked.connect(self.set_rules_requested)
         self.key = QComboBox(self)
         for k in KEYS:
             self.key.addItem(KEY_LABELS.get(k, k), k)     # shown as "W+A (up-left)", kept as "W+A"
@@ -79,6 +93,8 @@ class SetFrameGroupPanel(Panel):
         self.release = RuleEditor(self)
         self.release.compact()
         self.release.move(299, 114)
+        for w in (self.key, self.will_loop, self.release_label, self.release):
+            w.setParent(self._hidden)
         self.apply_btn = QPushButton("Apply", self)
         self.apply_btn.setGeometry(447, 175, 80, 26)
         self.apply_btn.setDefault(True)
@@ -183,6 +199,7 @@ class SetFrameGroupPanel(Panel):
         sel = self.controller.selected
         self._show_blank(self.blank)
         if self.blank:
+            self._show_rules(None)
             self.current_group_changed.emit(None)
             return
         self.name.setText(g.name if g else "")
@@ -198,7 +215,31 @@ class SetFrameGroupPanel(Panel):
         self.release.load(p, g.on_release if g else default)
         self._key_changed()
         self._thumbs()
+        self._show_rules(g)
         self.current_group_changed.emit(self.current)
+
+    def _show_rules(self, g) -> None:
+        """The short summary under RULES: what plays this group and what happens when its keys are let go."""
+        p = self.controller.project
+        self.rules_btn.setEnabled(p is not None)
+        lines: list[str] = []
+        if p is not None and g is not None:
+            for cr in p.control_rules:
+                if cr.group == g.name:
+                    lines.append(f"<b style='color:#ffffff'>{keys_text(cr.keys)}</b> held &rarr; plays, "
+                                 f"<span style='color:#9aa0ae'>{'once' if cr.once else 'loops'}</span>")
+            if g.key:
+                lines.append(f"<b style='color:#ffffff'>{g.key}</b> held &rarr; plays, <span style='color:#9aa0ae'>loops</span>")
+            if g.on_release is not None:
+                r = g.on_release
+                where = f"Frame {r.target}" if r.kind == "frame" else f"{r.target}" + (", loops" if r.loop else "")
+                lines.append(f"<b style='color:#ffffff'>On release</b> &rarr; {where}")
+        if not lines:
+            lines = ["<span style='color:#9aa0ae'>No rules for this group yet.</span>"]
+        shown = lines[:3]
+        if len(lines) > 3:
+            shown.append(f"<span style='color:#9aa0ae'>+ {len(lines) - 3} more</span>")
+        self.rules_text.setText("<br>".join(shown))
 
     def _show_blank(self, blank: bool) -> None:
         """Empty, greyed-out panel for a frame that is in no group."""

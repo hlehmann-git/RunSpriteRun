@@ -56,7 +56,7 @@ def fill(p, name, first, last, key="None"):
 
 def test_menu_states(win):
     assert win.act_new_group.isEnabled()
-    assert [a.text() for a in win.menu_group.actions()] == ["New Group", "Delete Group"]
+    assert [a.text() for a in win.menu_group.actions() if a.text()] == ["New Group", "Delete Group", "Frame Group Control"]
     assert win.act_delete_group.isEnabled()                   # frame 1 is in group Idle
     win.controller.select(9)                                  # a frame in no group: empty panel
     assert not win.act_delete_group.isEnabled()

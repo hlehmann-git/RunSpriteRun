@@ -10,7 +10,6 @@ Each project is made for one system, and the program keeps the colours inside th
 
 | System | Colours in a project | Colour depth |
 |---|---|---|
-| Sega Master System | 16 | 6-bit (RGB 2:2:2), 64 colours |
 | Sega Genesis / Mega Drive | 16 | 9-bit (RGB 3:3:3), 512 colours |
 | Super Nintendo (SNES) | 16 | 15-bit (RGB 5:5:5), 32,768 colours |
 | Atari ST | 16 | 9-bit (RGB 3:3:3), 512 colours |
@@ -25,14 +24,15 @@ The program counts colours for the whole project, not per tile or per sprite. Th
 ## What you can do
 
 - Start a project from image files, from a sprite sheet, or from a blank project, with a frame size from 4 to 128 pixels.
-- Have the colours snapped to the chosen system, with a palette and colour editor (the fixed-palette systems have their colours locked).
+- Have the colours snapped to the chosen system, with a palette and colour editor (the fixed-palette systems have their colours locked). Colours no frame uses stay in the palette until you delete them, and a **+** button adds a new colour with the sliders, the hex box or the pipette.
 - Put up to 120 frames on a timeline, select several frames at once, delete, copy and paste them, and rename them.
 - Group frames into animations (walk left, walk right, jump and so on), set the resting and start states, and **run** the animation with the keys (W, A, S, D, the diagonals and the number keys).
+- **Frame Group Control** (the **Set Rules** button) says which keys play which group, like a game controller: a direction or a combination (W+D, W+D+1, D then A) plays a group, once or looping, and each rule says what happens when the keys are let go. The controller shown matches the system (1 fire button, 3 on the Mega Drive, 6 on the SNES).
 - Edit pixels in Edit mode: pencil, eraser, bucket, line, square, circle, select, move, mirror drawing and three layers, with undo and redo.
 - **Edit > Shrink Sprite** makes every frame smaller (87.5%, 75%, 50%, 25% or 12.5% of the size) and snaps the result to the colours already in the project.
 - **Edit > Reduce Palette** lowers the number of colours in a project. The program picks the colours that matter most to the picture and moves every other pixel to the nearest one. A From / To preview shows the result before anything changes.
 - Create a blank sprite sheet for any system, ready to paint on in another program.
-- Export PNG sprite sheets (all frames and one per animation group) and one PNG per frame.
+- Export PNG sprite sheets (all frames and one per animation group) and one PNG per frame. Every Save and Export also writes `<Project>_Rules.txt` (tab-separated tables) and `<Project>_Rules.json` (for game developers) describing the groups and the key rules.
 
 Shrink Sprite and Reduce Palette cannot be undone. Both warn you first, and nothing is written to disk until you save.
 

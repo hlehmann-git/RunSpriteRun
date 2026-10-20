@@ -9,7 +9,7 @@ from src.core.systems import get_system
 from tests.helpers import make_png
 
 GENESIS = get_system("Sega Genesis / Mega Drive")
-SMS = get_system("Sega Master System")
+SMS = get_system("Atari ST")
 
 
 def test_natural_order(tmp_path):
@@ -76,7 +76,7 @@ def test_colour_count_limit_and_skip(tmp_path):
 
 
 def test_snapped_colours_counted_after_snapping(tmp_path):
-    # 20 distinct 8-bit colours that collapse to few valid ones on the 2-bit Master System
+    # 20 distinct 8-bit colours that collapse to few valid ones on the 3-bit Atari ST
     cols = [(i * 12, 0, 0) for i in range(20)]
     p = make_png(tmp_path / "a.png", size=(5, 4), colours=cols)
     res = import_files([p], SMS, 5, 4)

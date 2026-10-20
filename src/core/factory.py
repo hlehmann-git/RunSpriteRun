@@ -25,7 +25,8 @@ def create_project(name: str, system: System, width: int, height: int,
         frames=[Frame(f.label, f.image) for f in result.frames],
     )
     if system.is_fixed:
-        project.extra_colours = list(system.fixed)      # every colour of the system is in the palette from the start
+        used = list(project._used_colours())            # every colour of the system is in the palette from the start:
+        project.extra_colours = used + [c for c in system.fixed if c not in used]      # those the frames use first
     from .edit import renumber
     renumber(project)                       # labels are name_NNN, the number being the frame's position
     return project

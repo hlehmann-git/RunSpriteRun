@@ -6,7 +6,7 @@ import math
 from functools import lru_cache
 
 SIZE = 24
-LIQUID_TOP = 0.55                 # the liquid surface: everything below this line is liquid (flat top)
+LIQUID_TOP = 0.72                 # the liquid surface: everything below this line is liquid (flat top)
 
 
 def _mix(c, k):
@@ -17,7 +17,7 @@ def _mix(c, k):
 def eyedropper(liquid: tuple[int, int, int]) -> dict[tuple[int, int], tuple[int, int, int]]:
     n = SIZE
     glass, glass_hi, glass_lo = (232, 236, 245), (255, 255, 255), (150, 158, 182)
-    rubber, rubber_hi, rubber_lo = (70, 74, 88), (124, 130, 150), (38, 40, 50)
+    rubber, rubber_hi, rubber_lo = (40, 96, 200), (96, 156, 245), (22, 52, 128)     # the handle is blue
     edge = 1.3 / n
     px: dict[tuple[int, int], tuple[int, int, int]] = {}
     for y in range(n):

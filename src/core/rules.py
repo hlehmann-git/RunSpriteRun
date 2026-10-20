@@ -67,3 +67,31 @@ def old_label_name(label: str) -> str:
 def default_label(file_stem: str) -> str:
     """The name for a frame imported from a file or sheet: its name, disallowed characters become '_'."""
     return clean_name(file_stem)
+
+
+# ---- the controller (Frame Group Control) ---------------------------------------------------------------
+DIRECTION_KEYS = ("W", "A", "S", "D")
+FIRE_BUTTONS = {"Sega Genesis / Mega Drive": 3, "Super Nintendo (SNES)": 6}      # every other system has one fire button
+
+
+def buttons_for(system_name: str) -> int:
+    """How many fire buttons the system's standard controller has (the SNES counts its two shoulder buttons)."""
+    return FIRE_BUTTONS.get(system_name, 1)
+
+
+def keys_for(system_name: str) -> tuple[str, ...]:
+    """The single keys of the system's controller: W A S D and its fire buttons 1.. (the diagonals are two keys held)."""
+    return DIRECTION_KEYS + tuple(str(n) for n in range(1, buttons_for(system_name) + 1))
+
+
+def key_available(system_name: str, key: str | None) -> bool:
+    """False for a group's key that the system's controller does not have (a fire button above its count)."""
+    if key is None or key in KEYS[:8]:
+        return True
+    return key in keys_for(system_name)
+
+
+def keys_text(keys) -> str:
+    """Keys in a fixed order for display: W A S D first, then the buttons, joined with '+' (e.g. W+D+1)."""
+    order = {k: i for i, k in enumerate(("W", "A", "S", "D", "1", "2", "3", "4", "5", "6"))}
+    return "+".join(sorted(keys, key=lambda k: order.get(k, 99)))

@@ -477,7 +477,7 @@ def test_colour_editor_primary_secondary(win):
     e.editor_colour = (0, 0, 255)
     e.add_colour()
     pal = c.project.palette()
-    assert ed.cols["primary"] == e.active and ed.preview.size().width() == 36
+    assert ed.cols["primary"] == e.active and ed.preview.size().width() == 32
     c.palette_clicked.emit(1)
     assert e.active == pal[1]
     c.palette_right_clicked.emit(2)

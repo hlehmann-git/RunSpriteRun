@@ -247,6 +247,8 @@ class EditPanel(Panel):
         self.edit.changed.connect(self._refresh)
         controller.frames_changed.connect(self._refresh)
         controller.project_changed.connect(self._refresh)
+        controller.add_mode_changed.connect(lambda _on: self._refresh())
+        self._add_locked: list[QWidget] = []
         self._build_options()
         self._refresh()
 
@@ -270,18 +272,22 @@ class EditPanel(Panel):
 
     def _tool_clicked(self, name: str) -> None:
         if name == "plus":
-            self.edit.add_colour()
+            self.controller.toggle_add_mode()
             return
         self.edit.set_tool(name)
 
     # ---- state -> widgets ------------------------------------------------------------------------------
     def _refresh(self) -> None:
         e = self.edit
+        for w in self._add_locked:                 # whatever the "add new colour" mode switched off comes back first
+            w.setEnabled(True)
+        self._add_locked = []
         self.v1_btn.setChecked(not e.mode)
         self.edit_btn.setChecked(e.mode)
         self.work.setEnabled(e.mode)
+        adding = self.controller.add_mode
         for name, b in self.tool_buttons.items():
-            b.selected = e.mode and name == e.tool
+            b.selected = (adding if name == "plus" else e.mode and not adding and name == e.tool)
             b.update()
         plus = self.tool_buttons["plus"]
         p = self.controller.project
@@ -298,6 +304,15 @@ class EditPanel(Panel):
             self.actions[n].update()
         self.actions["undo"].setEnabled(e.can_undo)
         self.actions["redo"].setEnabled(e.can_redo)
+        if adding:                                 # the "add new colour" mode: only the + colour button (and Esc) works
+            keep = self.tool_buttons["plus"]
+            for w in (self.v1_btn, self.edit_btn, *self.work.findChildren(QWidget)):
+                if w is not keep and w.isEnabled():
+                    w.setEnabled(False)
+                    self._add_locked.append(w)
+            if not keep.isEnabled() and self.work.isEnabled():
+                keep.setEnabled(True)
+                self._add_locked.append(keep)
         if self._built_for != e.tool:
             self._build_options()
         self._refresh_select_buttons()

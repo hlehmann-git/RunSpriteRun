@@ -3,8 +3,8 @@ Pure logic with no UI. Frame numbers inside this module are 0-based; messages us
 from __future__ import annotations
 
 from .colour import Colour
-from .project import Group, Project, Rule
-from .rules import KEYS, MAX_GROUPS, valid_group_name
+from .project import ControlRule, Group, Project, Rule
+from .rules import KEYS, MAX_GROUPS, keys_text, valid_group_name
 
 MSG_NAME_CHARS = "Group names can only use letters, numbers, - and _ (no spaces)."
 MSG_NAME_DUPLICATE = "A group with that name already exists."
@@ -91,6 +91,10 @@ def save_group(project: Project, editing: str | None, name: str, first: int, las
             for rule in _rules(project):
                 if rule.kind == "group" and rule.target == editing:
                     rule.target = name
+        if editing != name:
+            for cr in project.control_rules:
+                if cr.group == editing:
+                    cr.group = name
         group.name, group.first, group.last = name, first, last
         group.key, group.on_release, group.colour = key, on_release, colour
         if on_release is not None and on_release.kind == "group" and on_release.target == editing:
@@ -104,6 +108,9 @@ def _rules(project: Project):
     for g in project.groups:
         if g.on_release is not None:
             yield g.on_release
+    for cr in project.control_rules:
+        if cr.release is not None:
+            yield cr.release
     if project.start_state is not None:
         yield project.start_state
 
@@ -118,6 +125,58 @@ def rules_pointing_to(project: Project, name: str) -> list[str]:
     out = [f"group {g.name} (On Release)" for g in project.groups
            if g.name != name                       # the deleted group's own rule goes with it
            and g.on_release is not None and g.on_release.kind == "group" and g.on_release.target == name]
+    out += [f"rule {keys_text(cr.keys)} (Frame Group Control)" for cr in project.control_rules if cr.group == name]
+    out += [f"rule {keys_text(cr.keys)} (When released)" for cr in project.control_rules
+            if cr.group != name and cr.release is not None and cr.release.kind == "group" and cr.release.target == name]
     if project.start_state is not None and project.start_state.kind == "group" and project.start_state.target == name:
         out.append("Start state")
     return out
+
+
+# ---- Frame Group Control rules (the keys that play a group) ----------------------------------------------------
+MSG_RULE_NO_KEYS = "A rule needs at least one key."
+MSG_RULE_NO_GROUP = "Choose a group for the rule."
+
+
+def check_control_rule(project: Project, rule: ControlRule) -> None:
+    """Raise GroupError if the rule cannot be kept."""
+    if not rule.keys:
+        raise GroupError(MSG_RULE_NO_KEYS)
+    if any(k not in ("W", "A", "S", "D", "1", "2", "3", "4", "5", "6") for k in rule.keys) or len(set(rule.keys)) != len(rule.keys):
+        raise GroupError("Unknown key.")
+    if find_group(project, rule.group) is None:
+        raise GroupError(MSG_RULE_NO_GROUP)
+
+
+def set_control_rules(project: Project, rules: list[ControlRule]) -> None:
+    for r in rules:
+        check_control_rule(project, r)
+    project.control_rules = list(rules)
+    project.dirty = True
+
+
+def set_group_key(project: Project, name: str, key: str | None) -> None:
+    """The basic key of a group (shown in the Frame Group Control window as a 'from the panel' row). A key another group
+    uses is taken from it: the caller asks first (msg_move_key)."""
+    g = find_group(project, name)
+    if g is None:
+        raise GroupError("That group no longer exists.")
+    if key is not None and key not in KEYS:
+        raise GroupError("Unknown key.")
+    owner = key_owner(project, key, ignore=name)
+    if owner is not None:
+        find_group(project, owner).key = None
+    g.key = key
+    project.dirty = True
+
+
+def set_group_release(project: Project, name: str, rule: Rule | None) -> None:
+    g = find_group(project, name)
+    if g is None:
+        raise GroupError("That group no longer exists.")
+    g.on_release = rule
+    project.dirty = True
+
+
+def control_rules_for(project: Project, name: str) -> list[ControlRule]:
+    return [cr for cr in project.control_rules if cr.group == name]

@@ -2,9 +2,9 @@
 free slots are white-outlined blocks with their slot number."""
 from __future__ import annotations
 
-from PySide6.QtCore import QRect, Qt, Signal
+from PySide6.QtCore import QPoint, QRect, Qt, Signal
 from PySide6.QtGui import QColor, QFont, QPainter, QPen
-from PySide6.QtWidgets import QLabel, QWidget
+from PySide6.QtWidgets import QLabel, QMenu, QWidget
 
 from src.app.controller import Controller
 from src.app.panel import Panel
@@ -17,6 +17,7 @@ TITLE = "Palette & Colour editor"        # one card: the palette on top, the col
 class PaletteGrid(QWidget):
     slot_clicked = Signal(int)
     slot_right_clicked = Signal(int)
+    slot_menu = Signal(int, QPoint)        # right click: the square and where to open the menu
 
     def __init__(self, parent: QWidget) -> None:
         super().__init__(parent)
@@ -25,6 +26,7 @@ class PaletteGrid(QWidget):
         self.transparent: tuple[int, int, int] | None = None
         self.active: tuple[int, int, int] | None = None      # Edit mode: the primary colour
         self.secondary: tuple[int, int, int] | None = None   # Edit mode: the secondary colour
+        self.add_slot: int | None = None                      # "add new colour" mode: the free square the colour will go into
         self._resize()
 
     def rows(self) -> int:
@@ -52,7 +54,10 @@ class PaletteGrid(QWidget):
         if event.button() in (Qt.LeftButton, Qt.RightButton):
             i = self.slot_at(event.position().toPoint())
             if i is not None and i < len(self.colours):      # free slots do nothing
-                (self.slot_clicked if event.button() == Qt.LeftButton else self.slot_right_clicked).emit(i)
+                if event.button() == Qt.LeftButton:
+                    self.slot_clicked.emit(i)
+                else:
+                    self.slot_menu.emit(i, event.globalPosition().toPoint())
 
     def paintEvent(self, event) -> None:
         p = QPainter(self)
@@ -84,6 +89,10 @@ class PaletteGrid(QWidget):
                 p.drawRect(r.adjusted(0, 0, -1, -1))
                 p.setFont(small)
                 p.drawText(r, Qt.AlignCenter, str(i + 1))
+            if self.add_slot == i:
+                p.setPen(QPen(QColor("#ffd24d"), 2))
+                p.setBrush(Qt.NoBrush)
+                p.drawRect(r.adjusted(1, 1, -2, -2))
 
 
 TOP_CARD_STYLE = ("Panel { background: #2a2c33; border: 1px solid #3a3d47; border-bottom: none; "
@@ -103,10 +112,33 @@ class PalettePanel(Panel):
         self.grid = PaletteGrid(self)
         self.grid.move(LEFT, TOP)
         self.grid.slot_clicked.connect(controller.palette_clicked.emit)
-        self.grid.slot_right_clicked.connect(controller.palette_right_clicked.emit)
+        self.grid.slot_menu.connect(self._open_menu)
         controller.project_changed.connect(self.refresh)
         controller.frames_changed.connect(self.refresh)
         controller.edit.changed.connect(self._show_active)
+        controller.add_mode_changed.connect(self._add_mode_changed)
+
+    def _open_menu(self, slot: int, where: QPoint) -> None:
+        """Right click on a palette square: Set as secondary colour (Edit mode only) and Delete colour."""
+        c = self.controller
+        p = c.project
+        if p is None or c.add_mode or not 0 <= slot < len(p.palette()):
+            return
+        menu = QMenu(self)
+        if c.edit.mode:
+            menu.addAction("Set as secondary colour").triggered.connect(lambda: c.palette_right_clicked.emit(slot))
+        reason = c.delete_colour_blocked(slot)
+        act = menu.addAction("Delete colour")
+        act.setEnabled(reason is None)
+        if reason is not None:
+            act.setToolTip(reason)
+        act.triggered.connect(lambda: c.delete_colour(slot))
+        menu.exec(where)
+
+    def _add_mode_changed(self, on: bool) -> None:
+        p = self.controller.project
+        self.grid.add_slot = len(p.palette()) if on and p is not None else None
+        self.grid.update()
 
     def _show_active(self) -> None:
         e = self.controller.edit

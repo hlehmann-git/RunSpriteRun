@@ -128,3 +128,23 @@ def test_old_file_labels_are_converted(project, tmp_path):
     assert not back.dirty
     save_project(back, f)
     assert [x.label for x in open_project(f).frames] == ["Idle_001", "Run_002"]
+
+
+def test_master_system_project_gives_a_clear_message(project, tmp_path):
+    p = tmp_path / "old.rsr"
+    save_project(project, p)
+    with zipfile.ZipFile(p) as z:
+        files = {n: z.read(n) for n in z.namelist()}
+    meta = json.loads(files["project.json"])
+    meta["system"] = "Sega Master System"
+    files["project.json"] = json.dumps(meta).encode()
+    with zipfile.ZipFile(p, "w") as z:
+        for n, data in files.items():
+            z.writestr(n, data)
+    with pytest.raises(ProjectFileError, match="no longer supported"):
+        open_project(p)
+
+
+def test_master_system_is_gone():
+    from src.core.systems import SYSTEMS
+    assert "Sega Master System" not in [s.name for s in SYSTEMS]

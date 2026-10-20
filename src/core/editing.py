@@ -122,3 +122,27 @@ def add_colour(project: Project, colour: Colour) -> bool:
         return False
     project.extra_colours.append(tuple(colour))
     return True
+
+
+def can_delete_colour(project: Project, colour: Colour) -> str | None:
+    """None if the colour can be deleted from the palette, otherwise the reason it can't."""
+    colour = tuple(colour)
+    if project.system.is_fixed:
+        return "The colours of this system are fixed"
+    if colour == tuple(project.transparent):
+        return "The transparent colour cannot be deleted"
+    if colour not in project.palette():
+        return "That colour is not in the palette"
+    if project.colour_is_used(colour):
+        return "This colour is used by a frame"
+    return None
+
+
+def delete_colour(project: Project, colour: Colour) -> bool:
+    """Take an unused colour out of the palette. The squares after it move up one place."""
+    if can_delete_colour(project, colour) is not None:
+        return False
+    colour = tuple(colour)
+    project.extra_colours = [c for c in project.palette() if c != colour]
+    project.dirty = True
+    return True

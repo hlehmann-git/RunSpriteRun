@@ -62,6 +62,11 @@ def write_all(project: Project, folder: Path, fill: Colour, with_data: bool) -> 
         name = sheets.frame_file_name(project, i)
         frame.image.save(folder / FOLDER_SPRITES / name, format="PNG")
         written.append(f"{FOLDER_SPRITES}/{name}")
+    from src.io import rules_export
+    try:
+        rules_export.write_rules_files(project, folder)     # <Project>_Rules.txt and .json in the project folder (not in `written`)
+    except OSError:
+        pass                                                # a rules file that cannot be written never stops a Save or an Export
     return written
 
 

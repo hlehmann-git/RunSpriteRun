@@ -77,6 +77,9 @@ def _all_rules(project: Project):
     for g in project.groups:
         if g.on_release is not None:
             yield g.on_release
+    for cr in project.control_rules:
+        if cr.release is not None:
+            yield cr.release
     if project.start_state is not None:
         yield project.start_state
 
@@ -90,6 +93,24 @@ def group_of_frame(project: Project) -> list[str | None]:
     return member
 
 
+def _drop_control_rules(project: Project, gone_groups: set[str], reset: list[str] | None = None,
+                        gone_labels: set[str] = frozenset()) -> None:
+    """Frame Group Control rules: a rule that plays a deleted group goes with it; a 'when released' target that is gone
+    is cleared (the rule then uses its group's On Release)."""
+    from .rules import keys_text
+    keep = []
+    for cr in project.control_rules:
+        if cr.group in gone_groups:
+            continue
+        r = cr.release
+        if r is not None and ((r.kind == "group" and r.target in gone_groups) or (r.kind == "frame" and r.target in gone_labels)):
+            cr.release = None
+            if reset is not None:
+                reset.append(f"rule {keys_text(cr.keys)} (When released)")
+        keep.append(cr)
+    project.control_rules = keep
+
+
 def delete_group(project: Project, name: str) -> list[str]:
     """Remove a group. Rules that pointed to it are cleared; returns where that happened,
     for the 'These rules pointed to <name> and have been reset' message."""
@@ -99,6 +120,7 @@ def delete_group(project: Project, name: str) -> list[str]:
         if g.on_release is not None and g.on_release.kind == "group" and g.on_release.target == name:
             g.on_release = None
             reset.append(f"group {g.name} (On Release)")
+    _drop_control_rules(project, {name}, reset)
     if project.start_state is not None and project.start_state.kind == "group" and project.start_state.target == name:
         project.start_state = None
         reset.append("Start state")
@@ -154,6 +176,7 @@ def move_frame(project: Project, src: int, dst: int,
                 other.on_release = None
         if project.start_state is not None and project.start_state.kind == "group" and project.start_state.target == g.name:
             project.start_state = None
+    _drop_control_rules(project, {g.name for g in removed})
     renumber(project)
     project.dirty = True
     return True
@@ -263,6 +286,11 @@ class DeletePlan:
     resets: list[str] = field(default_factory=list)      # rules that pointed at deleted frames or groups and are reset
 
 
+def _kt(keys) -> str:
+    from .rules import keys_text
+    return keys_text(keys)
+
+
 def plan_delete(project: Project, indices) -> DeletePlan:
     """What deleting these frames would do. Raises EditError if nothing valid is chosen or no frame would be left."""
     gone = set(indices)
@@ -280,6 +308,11 @@ def plan_delete(project: Project, indices) -> DeletePlan:
     for g in project.groups:
         if g.name not in plan.emptied and points_away(g.on_release):
             plan.resets.append(f"group {g.name} (On Release)")
+    for cr in project.control_rules:
+        if cr.group in plan.emptied:
+            plan.resets.append(f"rule {_kt(cr.keys)} (Frame Group Control)")
+        elif points_away(cr.release):
+            plan.resets.append(f"rule {_kt(cr.keys)} (When released)")
     if points_away(project.start_state):
         plan.resets.append("Start state")
     return plan
@@ -295,6 +328,7 @@ def delete_frames(project: Project, indices) -> DeletePlan:
         r = g.on_release
         if r is not None and ((r.kind == "frame" and r.target in labels) or (r.kind == "group" and r.target in plan.emptied)):
             g.on_release = None
+    _drop_control_rules(project, set(plan.emptied), None, labels)
     s = project.start_state
     if s is not None and ((s.kind == "frame" and s.target in labels) or (s.kind == "group" and s.target in plan.emptied)):
         project.start_state = None

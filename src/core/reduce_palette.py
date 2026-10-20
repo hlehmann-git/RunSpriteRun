@@ -102,6 +102,6 @@ def reduce_project(project: Project, keep: int) -> dict[Colour, Colour]:
         else:
             f.image = remap_image(f.image, mapping)
     kept = set(mapping.values())
-    project.extra_colours = [c for c in project.extra_colours if c in kept]        # the freed places are free again
+    project.extra_colours = [c for c in project.extra_colours if c in kept or c == project.transparent]   # the freed places are free again
     project.dirty = True
     return mapping

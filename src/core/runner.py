@@ -11,7 +11,10 @@ class Runner:
         self.project = project
         self.running = False
         self.held: list[str] = []                 # keys held that matter (own group, or part of a diagonal group), oldest first
-        self._current: str | None = None          # the key whose group is playing (a diagonal such as W+D counts as one key)
+        self._current: tuple | None = None        # what is playing: ("key", key) for a group's own key (a diagonal such as W+D counts as
+                                                  # one key), or ("rule", index) for a Frame Group Control rule
+        self._once = False                        # the sequence playing is a play-once one: it ends instead of looping
+        self._done: set[int] = set()              # play-once rules that finished while their keys are still held
         self._seq: list[int] = []                 # frames of the group being played
         self._pos = 0
         self.frame = 0                            # the frame being shown
@@ -21,19 +24,21 @@ class Runner:
     @property
     def animating(self) -> bool:
         """True while the frame shown changes with time (a looping group of two or more frames)."""
-        return self.running and len(self._seq) > 1
+        return self.running and (len(self._seq) > 1 or (self._once and bool(self._seq)))
 
     # ---- helpers --------------------------------------------------------------------------------
     def _group_for_key(self, key: str):
         return next((g for g in self.project.groups if g.key == key), None)
 
     def _play(self, group, loop: bool) -> None:
+        self._once = not loop                         # a group that is not looped plays through once (Frame Group Control rules)
         self._seq = list(range(group.first, group.last + 1))
         self._pos = 0
         self.frame = self._seq[0]
         self.playing_group = group.name
 
     def _hold(self, frame: int) -> None:
+        self._once = False
         self._seq = []
         self._pos = 0
         self.frame = frame
@@ -64,6 +69,7 @@ class Runner:
     def start(self) -> None:
         self.held.clear()
         self._current = None
+        self._done.clear()
         self.running = True
         self._show_start_state()
 
@@ -71,6 +77,7 @@ class Runner:
         """F5 again: stop and return the display to the start state. There is no pause."""
         self.held.clear()
         self._current = None
+        self._done.clear()
         self.running = False
         self._show_start_state()
         # the display is static now: a start state that plays a group shows that group's first frame
@@ -78,9 +85,24 @@ class Runner:
 
     # ---- keys -----------------------------------------------------------------------------------
     def _matters(self, key: str) -> bool:
-        """A key counts if it has its own group, or it is one half of a diagonal that has a group."""
-        return self._group_for_key(key) is not None or any(
-            key in parts and self._group_for_key(d) is not None for d, parts in DIAGONALS.items())
+        """A key counts if it has its own group, it is one half of a diagonal that has a group, or a Frame Group Control
+        rule uses it."""
+        return (self._group_for_key(key) is not None
+                or any(key in parts and self._group_for_key(d) is not None for d, parts in DIAGONALS.items())
+                or any(key in r.keys for r in self.project.control_rules))
+
+    def _group_named(self, name: str):
+        return next((g for g in self.project.groups if g.name == name), None)
+
+    def _wanted(self) -> tuple | None:
+        """What should play now. The Frame Group Control rules come first, top rule first: the first one whose keys are
+        all held (and that has not just finished playing once) wins. Then the basic key of a group."""
+        held = set(self.held)
+        for i, r in enumerate(self.project.control_rules):
+            if i not in self._done and r.keys and set(r.keys) <= held and self._group_named(r.group) is not None:
+                return ("rule", i)
+        key = self.effective_key()
+        return ("key", key) if key is not None else None
 
     def effective_key(self) -> str | None:
         """The key whose group should play: a diagonal that has a group wins (so W then A, or A then W, both give
@@ -96,10 +118,32 @@ class Runner:
         return list(self.held) + extra
 
     def _switch(self) -> None:
-        now = self.effective_key()
+        rules = self.project.control_rules
+        held = set(self.held)
+        self._done = {i for i in self._done if i < len(rules) and set(rules[i].keys) <= held}   # let go of the keys: it can fire again
+        now = self._wanted()
         if now is not None and now != self._current:
-            self._play(self._group_for_key(now), True)     # whatever was playing stops; the new group starts at its first frame
+            if now[0] == "rule":
+                r = rules[now[1]]
+                self._play(self._group_named(r.group), not r.once)    # whatever was playing stops; the new group starts at its first frame
+            else:
+                self._play(self._group_for_key(now[1]), True)
         self._current = now
+
+    def _rest_after(self, token: tuple) -> None:
+        """Nothing playable is held any more: the resting state of what was playing. A rule uses its own 'when released'
+        choice, else its group's On Release; an ignored rule stops on the group's last frame."""
+        if token[0] == "rule":
+            r = self.project.control_rules[token[1]] if token[1] < len(self.project.control_rules) else None
+            g = self._group_named(r.group) if r is not None else None
+            if g is None:
+                self._hold(self.frame)
+                return
+            self._apply(r.release if r.release is not None else g.on_release, g.last)
+        else:
+            g = self._group_for_key(token[1])
+            if g is not None:
+                self._apply(g.on_release, g.last)
 
     def press(self, key: str) -> bool:
         """A key goes down. Returns False if it was ignored (not running, no group for it, auto-repeat)."""
@@ -116,8 +160,7 @@ class Runner:
         self.held.remove(key)
         self._switch()
         if self._current is None and before is not None:   # nothing playable is held: the released group's resting state
-            g = self._group_for_key(before)
-            self._apply(g.on_release, g.last)              # an ignored rule stops on the group's last frame
+            self._rest_after(before)
         return True
 
     def release_all(self) -> None:
@@ -133,7 +176,21 @@ class Runner:
         before = self.frame
         if self._pos + 1 < len(self._seq):
             self._pos += 1
-        else:                                     # only looping sequences are ever played
+        elif self._once:                          # a play-once rule ends: the next rule or key takes over
+            return self._finish()
+        else:
             self._pos = 0
         self.frame = self._seq[self._pos]
         return self.frame != before or len(self._seq) > 1
+
+    def _finish(self) -> bool:
+        """A play-once rule reached its last frame while its keys are still held: it will not fire again until they are
+        let go, and the next matching rule (or the newest key's group) takes over; with none, its resting state."""
+        before = self._current
+        if before is not None and before[0] == "rule":
+            self._done.add(before[1])
+        self._once = False
+        self._switch()
+        if self._current is None and before is not None:
+            self._rest_after(before)
+        return True

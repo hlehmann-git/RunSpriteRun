@@ -64,7 +64,6 @@ APPLE2_COLOURS = _hex("000000", "DD0033", "000099", "DD22DD", "007722", "555555"
                       "885500", "FF6600", "AAAAAA", "FF9988", "11DD00", "FFFF00", "44FF99", "FFFFFF")
 
 SYSTEMS: tuple[System, ...] = (
-    System("Sega Master System", 16, 2, "6-bit (RGB 2:2:2)", 64),
     System("Sega Genesis / Mega Drive", 16, 3, "9-bit (RGB 3:3:3)", 512),
     System("Super Nintendo (SNES)", 16, 5, "15-bit (RGB 5:5:5)", 32768),
     System("Atari ST", 16, 3, "9-bit (RGB 3:3:3)", 512),

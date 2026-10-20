@@ -123,7 +123,7 @@ def test_write_all_makes_three_folders_and_all_files(tmp_path):
     assert (tmp_path / "out/Frame_Sprite_Sheets/Hero_Idle_SpriteSheet.png").exists()
     assert (tmp_path / "out/Frame_Sprite_Sheets/Hero_Walk_SpriteSheet.png").exists()
     assert len(list((tmp_path / "out/Sprites").iterdir())) == 6
-    assert not list((tmp_path / "out").rglob("*.txt"))                    # Export writes no data files
+    assert not [f for f in (tmp_path / "out").rglob("*.txt") if not f.name.endswith("_Rules.txt")]   # no frame data files; only the rules files
     assert set(written) == set(export.planned_files(p, with_data=False))
     im = Image.open(tmp_path / "out/Sprites/Hero_Idle_F1.png")
     assert im.mode == "RGB" and im.size == (8, 8) and im.tobytes() == p.frames[0].image.tobytes()
@@ -226,7 +226,9 @@ def test_export_writes_into_project_named_folder_and_stays_open(app, tmp_path, l
     assert d.run_export()
     assert (tmp_path / "Exports/Hero/Sprite_Sheet/Hero_SpriteSheet.png").exists()
     assert (tmp_path / "Exports/Hero/Sprites/Hero_NoGroup_F6.png").exists()
-    assert not list((tmp_path / "Exports").rglob("*.txt")) and not list((tmp_path / "Exports").rglob("*.rsr"))
+    assert not [f for f in (tmp_path / "Exports").rglob("*.txt") if not f.name.endswith("_Rules.txt")]
+    assert (tmp_path / "Exports/Hero/Hero_Rules.txt").exists() and (tmp_path / "Exports/Hero/Hero_Rules.json").exists()
+    assert not list((tmp_path / "Exports").rglob("*.rsr"))
     assert "Exported 6 frames and 3 sheets" in d.result.text()
     assert not p.dirty or p.dirty                                          # export never touches the project file state
 

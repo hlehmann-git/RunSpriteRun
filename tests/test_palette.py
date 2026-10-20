@@ -59,8 +59,6 @@ def test_square_geometry_matches_prd():
     assert palette.colour_at(st, 32, 0)[2] == level_to_8bit(1, 3)       # next tile: blue level 1
     assert palette.colour_at(st, 0, 64)[2] == level_to_8bit(4, 3)       # second tile row: blue level 4
     assert palette.colour_at(get_system("Amiga"), 127, 127) == (255, 255, 255)
-    assert palette.colour_at(get_system("Sega Master System"), 127, 127) == (255, 255, 255)
-    assert palette.colour_at(get_system("Sega Master System"), 64, 0)[2] == level_to_8bit(1, 2)
 
 
 def test_marker_round_trip():

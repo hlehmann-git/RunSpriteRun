@@ -35,6 +35,6 @@ def test_hex():
 
 
 def test_system_table():
-    assert [s.total_colours for s in SYSTEMS] == [64, 512, 32768, 512, 4096, 4096, 16, 16, 4096]
+    assert [s.total_colours for s in SYSTEMS] == [512, 32768, 512, 4096, 4096, 16, 16, 4096]
     assert all(s.total_colours == s.levels ** 3 for s in SYSTEMS if not s.is_fixed)
     assert get_system("Amiga").max_colours == 32

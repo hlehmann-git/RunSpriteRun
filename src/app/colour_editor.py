@@ -6,7 +6,9 @@ from PySide6.QtCore import QPoint, QRect, QRectF, Qt, Signal
 from PySide6.QtGui import QColor, QImage, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import QAbstractButton, QFrame, QLabel, QLineEdit, QPushButton, QSlider, QWidget
 
+from src.app import messages
 from src.app.controller import Controller
+from src.app.edit_panel import IconButton
 from src.app.panel import Panel
 from src.app.pixel_icons import SIZE, eyedropper
 from src.app.theme import TOGGLE_BUTTON_STYLE
@@ -71,12 +73,15 @@ class ColourSquare(QWidget):
             p.drawEllipse(QPoint(cx, cy), 4, 4)
 
 
+SIDE = 32                       # the T box, the + colour button, the colour pair and the eyedropper are all 32 x 32
+
+
 class Swatch(QAbstractButton):
-    """A 36 x 36 colour box with a border that turns yellow when armed."""
+    """A 32 x 32 colour box with rounded corners and a border that turns yellow when armed."""
 
     def __init__(self, parent: QWidget, text: str = "", clickable: bool = True) -> None:
         super().__init__(parent)
-        self.setFixedSize(36, 36)
+        self.setFixedSize(SIDE, SIDE)
         self.colour: Colour = (0, 0, 0)
         self.armed = False
         self.text_mark = text
@@ -94,30 +99,33 @@ class Swatch(QAbstractButton):
 
     def paintEvent(self, event) -> None:
         p = QPainter(self)
-        p.fillRect(self.rect(), QColor(*self.colour))
-        w = 2 if self.armed else 1
-        p.setPen(QPen(QColor(ARMED if self.armed else NORMAL), w))
-        p.drawRect(QRect(0, 0, 35, 35) if w == 1 else QRect(1, 1, 33, 33))
+        p.setRenderHint(QPainter.Antialiasing)
+        p.setPen(QPen(QColor(ARMED if self.armed else "#6a6e7a"), 2 if self.armed else 1))
+        p.setBrush(QColor(*self.colour))
+        off = 1.0 if self.armed else 0.5
+        p.drawRoundedRect(QRectF(off, off, SIDE - 2 * off, SIDE - 2 * off), 3, 3)
         if self.text_mark:
             p.setPen(QColor(255, 255, 255))
             p.drawText(self.rect(), Qt.AlignCenter, self.text_mark)
+        if not self.isEnabled():
+            p.fillRect(self.rect(), QColor(42, 44, 51, 150))
 
 
 class ColourPair(QWidget):
-    """Two overlapping 22 x 22 squares in the 36 x 36 space of the old single colour box: the primary colour in front
-    (top left) and the secondary colour behind (bottom right). The one being edited has the highlighted border; the
-    border turns yellow when it is armed to overwrite a palette square."""
+    """Two overlapping 20 x 20 rounded squares in a 32 x 32 space: the primary colour in front (top left) and the
+    secondary colour behind (bottom right). The one being edited has the highlighted border; the border turns yellow
+    when it is armed to overwrite a palette square."""
     clicked = Signal(str)
 
     def __init__(self, parent: QWidget) -> None:
         super().__init__(parent)
-        self.setFixedSize(36, 36)
+        self.setFixedSize(SIDE, SIDE)
         self.colours = {"primary": (0, 0, 0), "secondary": (0, 0, 0)}
         self.current = "primary"
         self.armed = False
         self.setFocusPolicy(Qt.NoFocus)
 
-    RECTS = {"secondary": QRect(14, 14, 22, 22), "primary": QRect(0, 0, 22, 22)}
+    RECTS = {"secondary": QRect(12, 12, 20, 20), "primary": QRect(0, 0, 20, 20)}
 
     def set_state(self, primary: Colour, secondary: Colour, current: str, armed: bool) -> None:
         self.colours = {"primary": primary, "secondary": secondary}
@@ -131,14 +139,15 @@ class ColourPair(QWidget):
 
     def paintEvent(self, event) -> None:
         p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
         for which in ("secondary", "primary"):                      # primary last: it is in front
             r = self.RECTS[which]
-            p.fillRect(r, QColor(*self.colours[which]))
             on = which == self.current
             colour = ARMED if (on and self.armed) else "#ffffff" if on else "#8a8f9c"
             p.setPen(QPen(QColor(colour), 2 if on else 1))
-            p.drawRect(r.adjusted(1, 1, -1, -1) if on else r.adjusted(0, 0, -1, -1))
-        p.setPen(QPen(QColor(10, 10, 12), 1))
+            p.setBrush(QColor(*self.colours[which]))
+            off = 1.0 if on else 0.5
+            p.drawRoundedRect(QRectF(r.x() + off, r.y() + off, r.width() - 2 * off, r.height() - 2 * off), 3, 3)
 
 
 class EyedropperButton(QAbstractButton):
@@ -146,7 +155,7 @@ class EyedropperButton(QAbstractButton):
 
     def __init__(self, parent: QWidget) -> None:
         super().__init__(parent)
-        self.setFixedSize(36, 36)
+        self.setFixedSize(SIDE, SIDE)
         self.armed = False
         self.colour: Colour = (0, 146, 255)
         self.setToolTip("Colour picker (eyedropper)")
@@ -161,14 +170,17 @@ class EyedropperButton(QAbstractButton):
 
     def paintEvent(self, event) -> None:
         p = QPainter(self)
-        p.fillRect(self.rect(), QColor("#1e1f24"))
+        p.setRenderHint(QPainter.Antialiasing)
         p.setPen(QPen(QColor(ARMED if self.armed else "#4a4e5a"), 2 if self.armed else 1))
-        p.drawRect(QRect(1, 1, 33, 33) if self.armed else QRect(0, 0, 35, 35))
+        p.setBrush(QColor("#1e1f24"))
+        off = 1.0 if self.armed else 0.5
+        p.drawRoundedRect(QRectF(off, off, SIDE - 2 * off, SIDE - 2 * off), 3, 3)
         img = QImage(SIZE, SIZE, QImage.Format_ARGB32)
         img.fill(0)
         for (x, y), c in eyedropper(tuple(self.colour)).items():
             img.setPixelColor(x, y, QColor(*c))
-        p.drawImage(QRect(0, 0, 36, 36), img)              # no smoothing: pixel art stays crisp
+        p.setRenderHint(QPainter.SmoothPixmapTransform, True)
+        p.drawImage(QRect(3, 3, SIDE - 6, SIDE - 6), img)    # a little smaller than the box, so the whole drawing fits
 
 
 PANEL_H = 204                # the bottom half of the one card (the palette is the top half)
@@ -230,29 +242,41 @@ class ColourEditorPanel(Panel):
         hex_label.setGeometry(160, 106, 28, 24)
         self.hex = QLineEdit(self)
         self.hex.setGeometry(192, 106, 88, 24)
+        self.apply_btn = QPushButton("Apply", self)               # "add new colour" mode: adds the colour to the free square
+        self.apply_btn.setGeometry(284, 106, 40, 24)
+        self.apply_btn.setFocusPolicy(Qt.NoFocus)
+        self.apply_btn.setToolTip("Add this colour to the palette (only while adding a new colour)")
+        self.apply_btn.setEnabled(False)
+        self.apply_btn.clicked.connect(self._apply_clicked)
         self.hex.setMaxLength(7)
         self.hex.editingFinished.connect(self._hex_finished)
 
         self.t_box = Swatch(self, "T")
-        self.t_box.move(16, 156)
+        self.t_box.move(16, 158)
         self.t_box.setToolTip("Set transparent colour")
         self.t_box.clicked.connect(self._toggle_transparent)
         self.t_label = QLabel("Transparent colour", self)
-        self.t_label.setGeometry(62, 156, 130, 36)
+        self.t_label.setGeometry(58, 156, 130, 36)
         self.t_label.setStyleSheet("font-weight: 600;")
         self.cols = {"primary": (0, 0, 0), "secondary": (0, 0, 0)}   # primary (front) and secondary (behind) colours
         self.current = "primary"                    # which of the two the square, sliders and Hex box are editing
         self.preview = ColourPair(self)
-        self.preview.move(238, 156)
+        self.preview.move(248, 158)
         self.preview.setToolTip("Primary colour (front) and secondary colour (behind). Click one to edit it, then "
                                 "click a palette square to overwrite that square. Left click on the colour square or "
                                 "the picker sets the primary colour, right click the secondary.")
         self.preview.clicked.connect(self._pair_clicked)
+        self.add_btn = IconButton("plus", self)                  # the same button as + colour in the Edit panel
+        self.add_btn.move(208, 158)
+        self.add_btn.clicked.connect(self.controller.toggle_add_mode)
         self.eyedropper = EyedropperButton(self)
-        self.eyedropper.move(284, 156)
+        self.eyedropper.move(288, 158)
         self.eyedropper.clicked.connect(self._toggle_eyedropper)
 
         controller.project_changed.connect(self._project_changed)
+        controller.project_changed.connect(self._refresh_add_btn)
+        controller.frames_changed.connect(self._refresh_add_btn)
+        controller.add_mode_changed.connect(self._add_mode_changed)
         controller.frames_changed.connect(self._refresh_transparent)
         controller.edit.colour_added.connect(self._colour_added)
         controller.palette_clicked.connect(lambda slot: self._palette_clicked(slot, "primary"))
@@ -291,6 +315,33 @@ class ColourEditorPanel(Panel):
         self.current = "primary"
         self._set_colour(pal[0])
         self._refresh_transparent()
+
+    def _refresh_add_btn(self) -> None:
+        reason = self.controller.add_colour_blocked()
+        self.add_btn.setEnabled(reason is None or self.controller.add_mode)
+        self.add_btn.setToolTip("Add a new colour to the palette (Esc cancels)" if reason is None else reason)
+
+    def _add_mode_changed(self, on: bool) -> None:
+        """The "add new colour" mode: the pipette is armed, the T box and palette squares do nothing, and Apply is the
+        only way to add the colour. Esc (handled by the window) or the + button again cancels."""
+        self.add_btn.selected = on
+        self.add_btn.update()
+        self.apply_btn.setEnabled(on)
+        self.t_box.setEnabled(not on)
+        self._arm("eyedropper" if on else None)
+        if not on:
+            self._refresh_add_btn()
+
+    def _apply_clicked(self) -> None:
+        c = self.controller
+        p = c.project
+        if p is None or not c.add_mode:
+            return
+        if p.system.snap(self.colour) in p.palette():
+            messages.warn(self.window(), "That colour is already in the palette.", "Choose a different colour.")
+            return                                       # still adding: back to choosing
+        c.edit.add_colour()                              # the Pencil with the new colour is ready (in Edit mode)
+        c.cancel_add_mode()                              # done: back to normal
 
     def _refresh_transparent(self) -> None:
         p = self.controller.project
@@ -336,6 +387,8 @@ class ColourEditorPanel(Panel):
         self.preview.set_state(self.cols["primary"], self.cols["secondary"], self.current, self.armed)
 
     def _arm(self, which: str | None) -> None:
+        if self.controller.add_mode and which in ("preview", "transparent"):
+            which = "eyedropper" if self.eyedropper_armed else None      # adding a colour: nothing is overwritten
         if which == "preview" and getattr(self, "locked", False):
             which = None                                     # nothing to overwrite: the colours are fixed
         self.armed = which == "preview"
@@ -397,8 +450,8 @@ class ColourEditorPanel(Panel):
     # ---- clicks elsewhere ---------------------------------------------------------------------------
     def _palette_clicked(self, slot: int, which: str = "primary") -> None:
         p = self.controller.project
-        if p is None:
-            return
+        if p is None or self.controller.add_mode:
+            return                                      # adding a new colour: the palette squares do nothing
         colours = p.palette()
         if not 0 <= slot < len(colours):
             return                                      # a free slot does nothing

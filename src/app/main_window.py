@@ -96,8 +96,12 @@ class MainWindow(QMainWindow):
         self.project: Project | None = None
         self.set_frame_group = self.panels["Set Frame Group"]
         self.set_frame_group.current_group_changed.connect(lambda _name: self._update_group_actions())
+        self.set_frame_group.set_rules_requested.connect(self.show_control_window)
+        self.control_window = None                                # the Frame Group Control window, made when first opened
         self.controller.frames_changed.connect(self._update_group_actions)
         self.controller.history_changed.connect(self._update_edit_actions)
+        self._add_locked_actions: list = []
+        self.controller.add_mode_changed.connect(self._lock_for_add)
         self.controller.edit.changed.connect(self._edit_mode_changed)
         self.controller.frames_changed.connect(self._update_save_action)
         self.controller.history_changed.connect(self._update_save_action)
@@ -159,6 +163,7 @@ class MainWindow(QMainWindow):
         self.act_save_as = a(self.menu_file, "Save As")
         self.act_info = a(self.menu_file, "Project Information")
         self.act_export = a(self.menu_file, "Export", "Ctrl+E")
+        self.act_export_rules = a(self.menu_file, "Export Rules")
         self.act_blank_sheet = a(self.menu_file, "Create Blank Sprite Sheet")
         self.act_settings = a(self.menu_file, "Settings", "Ctrl+,")
         self.act_exit = a(self.menu_file, "Exit")
@@ -169,6 +174,8 @@ class MainWindow(QMainWindow):
         self.act_reduce = a(self.menu_edit, "Reduce Palette")
         self.act_new_group = a(self.menu_group, "New Group", "Ctrl+G")
         self.act_delete_group = a(self.menu_group, "Delete Group")
+        self.menu_group.addSeparator()
+        self.act_control = a(self.menu_group, "Frame Group Control")
         self.act_help = a(self.menu_help, "RunSpriteRun Help (F1)", "F1")
         self.act_about = a(self.menu_about, "About RunSpriteRun")
         self.act_exit.triggered.connect(self.close)
@@ -184,14 +191,33 @@ class MainWindow(QMainWindow):
         self.act_save_as.triggered.connect(self.save_as)
         self.act_info.triggered.connect(self.show_information)
         self.act_export.triggered.connect(self.show_export)
+        self.act_export_rules.triggered.connect(self.export_rules)
+        self.act_control.triggered.connect(self.show_control_window)
         self.act_blank_sheet.triggered.connect(self.show_blank_sheet)
         self.act_settings.triggered.connect(self.show_settings)
         self.act_help.triggered.connect(lambda: HelpDialog(self).exec())
         self.act_about.triggered.connect(lambda: AboutDialog(self).exec())
 
     # ---- RunSpriteRun: F5 and the keys -----------------------------------------------------------------
+    def _lock_for_add(self, on: bool) -> None:
+        """The "add new colour" mode: the menus, the timeline, the group panel and the run and preview windows are
+        switched off. The Frame view stays on for the pipette, and the Edit panel and Colour editor lock themselves."""
+        if on:
+            self._add_locked_actions = [a for m in (self.menu_file, self.menu_edit, self.menu_group, self.menu_help, self.menu_about)
+                                        for a in m.actions() if a.isEnabled()]
+            for a in self._add_locked_actions:
+                a.setEnabled(False)
+        else:
+            for a in self._add_locked_actions:
+                a.setEnabled(True)
+            self._add_locked_actions = []
+            self._update_edit_actions()
+            self._update_group_actions()
+        for name in ("Timeline and frames", "Set Frame Group", "RunSpriteRun window", "Frame Group Preview"):
+            self.panels[name].setEnabled(not on)
+
     def toggle_run(self) -> None:
-        if self.controller.project is None:
+        if self.controller.project is None or self.controller.add_mode:
             return
         if not self.controller.running:
             self._clear_text_focus()                       # keys only work when no text box has focus
@@ -209,7 +235,7 @@ class MainWindow(QMainWindow):
 
     def eventFilter(self, obj, event) -> bool:
         t = event.type()
-        if t in (QEvent.KeyPress, QEvent.KeyRelease) and event.key() in RUN_KEYS:
+        if t in (QEvent.KeyPress, QEvent.KeyRelease) and event.key() in RUN_KEYS and not self.controller.add_mode:
             if event.modifiers() & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier):
                 return False
             key = RUN_KEYS[event.key()]
@@ -224,6 +250,10 @@ class MainWindow(QMainWindow):
                     return True
                 if not event.isAutoRepeat() and self.controller.start_with_key(key):
                     return True                           # a key with a group starts RunSpriteRun (as F5 does)
+        elif (t == QEvent.KeyPress and self.controller.add_mode and event.key() == Qt.Key_Escape
+              and QApplication.activeModalWidget() is None):
+            self.controller.cancel_add_mode()                 # Esc cancels adding a new colour
+            return True
         elif t == QEvent.KeyPress and self.controller.edit.mode and self._edit_key(event):
             return True
         elif t in (QEvent.WindowDeactivate, QEvent.ApplicationDeactivate) and obj is self:
@@ -232,7 +262,8 @@ class MainWindow(QMainWindow):
 
     def _edit_key(self, event) -> bool:
         """Keys of the Select tool in Edit mode: Ctrl+A, C, X, V, Delete, Enter (fix a paste), Esc (discard), arrows."""
-        if not self.isActiveWindow() or QApplication.activeModalWidget() is not None or self._text_focus():
+        if (not self.isActiveWindow() or QApplication.activeModalWidget() is not None or self._text_focus()
+                or self.controller.add_mode):
             return False
         e = self.controller.edit
         key, mods = event.key(), event.modifiers()
@@ -381,6 +412,41 @@ class MainWindow(QMainWindow):
         if self.controller.project is not None and not self._editing():
             ExportDialog(self, self.controller.project).exec()
 
+    def show_control_window(self) -> None:
+        """Set Rules / Group > Frame Group Control: the window that says which keys play which frame group. It stays open
+        beside the main window."""
+        if self.controller.project is None or self._editing():
+            return
+        if self.control_window is None:
+            from src.app.control_window import ControlWindow
+            self.control_window = ControlWindow(self, self.controller)
+        self.control_window.rebuild()
+        self.control_window.show()
+        self.control_window.raise_()
+        self.control_window.activateWindow()
+
+    def export_rules(self) -> None:
+        """File > Export Rules: save the rules of the project as one file of the owner's choice (tab-separated text or JSON)."""
+        p = self.controller.project
+        if p is None or self._editing():
+            return
+        from PySide6.QtWidgets import QFileDialog
+        from src.io import rules_export
+        txt, _js = rules_export.rules_file_names(p)
+        start = str(paths.exports_folder() / txt)
+        path, chosen = QFileDialog.getSaveFileName(self, "Export Rules", start,
+                                                   "Tab-separated text (*.txt);;JSON for developers (*.json)")
+        if not path:
+            return
+        as_json = path.lower().endswith(".json") or (not path.lower().endswith(".txt") and "JSON" in chosen)
+        if not path.lower().endswith((".txt", ".json")):
+            path += ".json" if as_json else ".txt"
+        try:
+            Path(path).write_text(rules_export.rules_json(p) if as_json else rules_export.rules_text(p),
+                                  encoding="utf-8", newline="\n")
+        except OSError as e:
+            messages.warn(self, f"{Path(path).name} could not be saved. {e.strerror or e}")
+
     def show_blank_sheet(self) -> None:
         BlankSheetDialog(self).exec()          # needs no project (FR-4.9)
 
@@ -449,7 +515,7 @@ class MainWindow(QMainWindow):
             self._edit_mode_changed()
         for act in (self.act_open, self.act_save, self.act_save_as, self.act_info, self.act_export,
                     self.act_settings, self.act_help, self.act_about,
-                    self.act_new_group, self.act_delete_group):
+                    self.act_new_group, self.act_delete_group, self.act_control, self.act_export_rules):
             act.setEnabled(active)
         self._update_group_actions()
         self._update_edit_actions()
@@ -487,6 +553,8 @@ class MainWindow(QMainWindow):
         active = p is not None and not self.controller.edit.mode       # Group menu is off while editing
         self.act_new_group.setEnabled(active and len(p.groups) < MAX_GROUPS)
         self.act_delete_group.setEnabled(active and self.set_frame_group.current is not None)
+        self.act_control.setEnabled(active)
+        self.act_export_rules.setEnabled(p is not None and not self.controller.edit.mode)
 
     def delete_group(self) -> None:
         name = self.set_frame_group.current

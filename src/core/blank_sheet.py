@@ -20,7 +20,6 @@ DEFAULT_FILL: Colour = (255, 0, 255)   # inside of an empty box: magenta, the tr
 FOLDER = "Blank sprite sheets"
 
 FOLDER_NAMES = {
-    "Sega Master System": "Master_System",
     "Sega Genesis / Mega Drive": "Genesis_Megadrive",
     "Super Nintendo (SNES)": "SuperFamicom_SNES",
     "Atari ST": "Atari_ST",

@@ -7,7 +7,7 @@ from PySide6.QtWidgets import QWidget
 
 from src.app import messages
 from src.app.edit_session import EditSession
-from src.core import edit, groups, history, palette
+from src.core import edit, editing, groups, history, palette
 from src.core.project import Frame, Project, Rule
 from src.core.runner import Runner
 from src.io import settings as settings_io
@@ -28,6 +28,7 @@ class Controller(QObject):
     frame_pixel_clicked = Signal(tuple)  # a pixel of the Frame view was clicked: its colour
     palette_right_clicked = Signal(int)  # right click on a palette square (0-based slot)
     frame_pixel_right_clicked = Signal(tuple)  # right click on a pixel of the Frame view: its colour
+    add_mode_changed = Signal(bool)   # the "add new colour" mode started or ended
 
     def __init__(self, parent_widget: QWidget | None = None, settings: settings_io.Settings | None = None) -> None:
         super().__init__()
@@ -40,12 +41,14 @@ class Controller(QObject):
         self.history = history.History()
         self.edit = EditSession(self)
         self.eyedropper_armed = False      # set by the Colour editor
+        self.add_mode = False              # the "add new colour" mode: everything else is locked until Apply or Esc
         self.clipboard_frames: list[Frame] = []      # Ctrl+C in the Timeline: the frames as they were when copied
         self.timer = QTimer(self)
         self.timer.timeout.connect(self._tick)
         self.frames_changed.connect(self._frames_changed)
         self.selection_changed.connect(self._selection_changed)
         self.project_changed.connect(self.drop_frame_clipboard)
+        self.project_changed.connect(self.cancel_add_mode)
 
     def set_project(self, project: Project | None) -> None:
         self.stop_run()
@@ -259,6 +262,49 @@ class Controller(QObject):
         self.select(group.first)
         return True
 
+    # ---- Frame Group Control (rules) ----------------------------------------------------------
+    def set_control_rules(self, rules) -> bool:
+        """Replace the Frame Group Control rule list (one Undo step). Shows the message and does nothing if a rule is not valid."""
+        assert self.project is not None
+        try:
+            before = self.checkpoint()
+            groups.set_control_rules(self.project, rules)
+        except groups.GroupError as e:
+            messages.warn(self.parent_widget, str(e))
+            return False
+        self.commit(before)
+        self.frames_changed.emit()
+        return True
+
+    def set_group_key(self, name: str, key) -> bool:
+        """The basic key of a group, edited in the Frame Group Control window. A key another group uses is moved after asking."""
+        assert self.project is not None
+        try:
+            before = self.checkpoint()
+            owner = groups.key_owner(self.project, key, ignore=name)
+            if owner is not None and not messages.choose(self.parent_widget, groups.msg_move_key(key, owner, name),
+                                                         "", "Move", "Cancel"):
+                return False
+            groups.set_group_key(self.project, name, key)
+        except groups.GroupError as e:
+            messages.warn(self.parent_widget, str(e))
+            return False
+        self.commit(before)
+        self.frames_changed.emit()
+        return True
+
+    def set_group_release(self, name: str, rule: Rule | None) -> bool:
+        assert self.project is not None
+        try:
+            before = self.checkpoint()
+            groups.set_group_release(self.project, name, rule)
+        except groups.GroupError as e:
+            messages.warn(self.parent_widget, str(e))
+            return False
+        self.commit(before)
+        self.frames_changed.emit()
+        return True
+
     def set_start_state(self, rule: Rule | None) -> None:
         assert self.project is not None
         before = self.checkpoint()
@@ -332,7 +378,68 @@ class Controller(QObject):
         settings_io.save(new)
         self.settings_changed.emit()
 
+    # ---- add new colour mode ---------------------------------------------------------------------
+    def add_colour_blocked(self) -> str | None:
+        """None if a new colour can be added now, otherwise the reason it can't."""
+        p = self.project
+        if p is None:
+            return "No project is open"
+        if p.system.is_fixed:
+            return "The colours of this system are fixed"
+        if len(p.palette()) >= p.system.max_colours:
+            return "The palette is full"
+        if self.edit.mode and self.edit.floating is not None:
+            return "Press Enter to fix the paste or Esc to discard it first."
+        return None
+
+    def start_add_mode(self) -> bool:
+        if self.add_mode:
+            return True
+        reason = self.add_colour_blocked()
+        if reason is not None:
+            if self.edit.mode:
+                self.edit.notice.emit(reason)
+            return False
+        self.stop_run()
+        self.add_mode = True
+        self.add_mode_changed.emit(True)
+        return True
+
+    def cancel_add_mode(self) -> None:
+        if self.add_mode:
+            self.add_mode = False
+            self.add_mode_changed.emit(False)
+
+    def toggle_add_mode(self) -> None:
+        if self.add_mode:
+            self.cancel_add_mode()
+        else:
+            self.start_add_mode()
+
     # ---- palette (FR-3.13) ---------------------------------------------------------------------
+    def delete_colour_blocked(self, slot: int) -> str | None:
+        """None if the colour in palette slot `slot` can be deleted, otherwise the reason it can't."""
+        p = self.project
+        if p is None:
+            return "No project is open"
+        colours = p.palette()
+        if not 0 <= slot < len(colours):
+            return "That colour is not in the palette"
+        if self.edit.mode and self.edit.floating is not None:
+            return "Press Enter to fix the paste or Esc to discard it first."
+        return editing.can_delete_colour(p, colours[slot])
+
+    def delete_colour(self, slot: int) -> bool:
+        """Delete an unused colour from the palette (the squares after it move up one place)."""
+        if self.delete_colour_blocked(slot) is not None:
+            return False
+        p = self.project
+        before = self.checkpoint()
+        editing.delete_colour(p, p.palette()[slot])
+        self.commit(before)
+        self.frames_changed.emit()
+        return True
+
     def replace_colour(self, slot: int, new) -> bool:
         """Overwrite palette slot `slot` with `new` (snapped). Asks first if the colour is already in the
         palette, because merging frees a slot."""

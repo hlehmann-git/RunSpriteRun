@@ -30,6 +30,16 @@ class Group:
     colour: Colour = (0, 0, 0)   # interface-only border colour (FR-3.11)
 
 
+@dataclass
+class ControlRule:
+    """A Frame Group Control rule: while all of `keys` are held, play `group`. Rules are checked from the top of the
+    list and the first match wins; they sit above the basic key of each group (Group.key)."""
+    keys: list[str]                    # W A S D and the fire buttons that must all be held, e.g. ["W", "D", "1"]
+    group: str                         # the group that plays
+    once: bool = False                 # True: play through one time, then hand over; False: loop while the keys are held
+    release: Rule | None = None        # when all keys are let go (or a play-once ends with nothing held): None = the group's On Release
+
+
 _uids = itertools.count(1)
 
 
@@ -53,15 +63,15 @@ class Project:
     frames: list[Frame] = field(default_factory=list)
     groups: list[Group] = field(default_factory=list)
     start_state: Rule | None = None
+    control_rules: list[ControlRule] = field(default_factory=list)   # Frame Group Control rules, top rule first
     file_path: str | None = None
     source_sheet: str | None = None   # sprite sheet this project was imported from; copied into the project folder on first Save
     written_files: list[str] = field(default_factory=list)   # files Save wrote last time (relative paths), for cleaning up
-    extra_colours: list[Colour] = field(default_factory=list)   # V2.0: colours added with the + colour tool before they are drawn
+    extra_colours: list[Colour] = field(default_factory=list)   # the saved palette order, kept colours included (see palette())
     dirty: bool = True      # a new project counts as unsaved until first saved (section 5.3)
 
-    def palette(self) -> list[Colour]:
-        """FR-3.13: colours in order of first appearance (frame order, then left to right,
-        top to bottom). The transparent colour is always kept: if no frame uses it, it goes last."""
+    def _used_colours(self) -> dict[Colour, None]:
+        """The colours the frames use, in order of first appearance (frame order, then left to right, top to bottom)."""
         seen: dict[Colour, None] = {}
         for f in self.frames:
             for img in ((f.image,) if f.layers is None else (f.image, *f.layers)):
@@ -69,12 +79,26 @@ class Project:
                 for c in zip(data[0::3], data[1::3], data[2::3]):
                     if c not in seen:
                         seen[c] = None
+        return seen
+
+    def colour_is_used(self, colour: Colour) -> bool:
+        """True if any frame (any layer) has a pixel of this colour."""
+        return tuple(colour) in self._used_colours()
+
+    def palette(self) -> list[Colour]:
+        """FR-3.13: the palette. It is a saved list (`extra_colours`) that keeps its order: a colour stays in its slot
+        even when no frame uses it any more (it leaves only with Delete colour or Reduce Palette). Colours the
+        frames use that are not in the list yet are added at the end in order of first appearance, and the
+        transparent colour is always there. The list is brought up to date here, so it always holds the whole palette."""
+        order: dict[Colour, None] = {}
         for c in self.extra_colours:
-            if c not in seen and c != self.transparent:
-                seen[c] = None
-        if self.transparent not in seen:
-            seen[self.transparent] = None
-        return list(seen)
+            order.setdefault(tuple(c), None)
+        for c in self._used_colours():
+            order.setdefault(c, None)
+        order.setdefault(tuple(self.transparent), None)
+        result = list(order)
+        self.extra_colours = list(result)
+        return result
 
     def colours_in_use(self) -> int:
         return len(self.palette())

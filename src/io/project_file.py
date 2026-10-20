@@ -12,7 +12,7 @@ from pathlib import Path
 from PIL import Image
 
 from src.core.layers import colours_of, flatten
-from src.core.project import Frame, Group, Project, Rule
+from src.core.project import ControlRule, Frame, Group, Project, Rule
 from src.core.rules import FPS_CHOICES, MAX_FRAMES, MAX_SIZE, MIN_SIZE, valid_label, valid_project_name
 from src.core.systems import get_system
 
@@ -53,6 +53,7 @@ def _png(img: Image.Image) -> bytes:
 def save_project(project: Project, path: str | Path) -> None:
     """Write atomically: a failed save leaves any existing file untouched."""
     path = Path(path)
+    project.palette()                         # bring the saved palette order up to date
     meta = {
         "format_version": FORMAT_VERSION,
         "app": "RunSpriteRun",
@@ -64,11 +65,14 @@ def save_project(project: Project, path: str | Path) -> None:
         "transparent": list(project.transparent),
         "written_files": list(project.written_files),
         "extra_colours": [list(c) for c in project.extra_colours],
+        "palette_saved": True,                # the list above is the whole palette in slot order (kept colours included)
         "frames": [_frame_json(i, f) for i, f in enumerate(project.frames)],
         "groups": [{"name": g.name, "first": g.first, "last": g.last, "key": g.key,
                     "on_release": _rule_to_json(g.on_release), "colour": list(g.colour)}
                    for g in project.groups],
         "start_state": _rule_to_json(project.start_state),
+        "control_rules": [{"keys": list(r.keys), "group": r.group, "once": r.once, "release": _rule_to_json(r.release)}
+                          for r in project.control_rules],          # Frame Group Control rules, top rule first
         "labels": "numbered",          # labels are name_NNN (NNN = position); files without this are converted on opening
     }
     fd, tmp = tempfile.mkstemp(suffix=".tmp", dir=path.parent)
@@ -117,6 +121,8 @@ def open_project(path: str | Path) -> Project:
             try:
                 system = get_system(meta["system"])
             except KeyError:
+                if meta.get("system") == "Sega Master System":
+                    raise ProjectFileError("Sega Master System is no longer supported, so this project cannot be opened.") from None
                 raise ProjectFileError("The file names an unknown system.") from None
             w, h, fps = meta["width"], meta["height"], meta["fps"]
             if not (isinstance(w, int) and isinstance(h, int) and MIN_SIZE <= w <= MAX_SIZE and MIN_SIZE <= h <= MAX_SIZE):
@@ -182,9 +188,22 @@ def open_project(path: str | Path) -> Project:
                 if not (0 <= g.first <= g.last < len(frames)):
                     raise ProjectFileError("A frame group in the file is outside the frames.")
 
+            control = []
+            names = {g.name for g in groups}
+            for d in meta.get("control_rules", []):                    # a damaged or out-of-date rule is dropped, never the project
+                try:
+                    keys = [k for k in d["keys"]]
+                    if (keys and all(isinstance(k, str) and k in ("W", "A", "S", "D", "1", "2", "3", "4", "5", "6") for k in keys)
+                            and len(set(keys)) == len(keys) and d["group"] in names):
+                        control.append(ControlRule(keys, d["group"], bool(d.get("once", False)), _rule_from_json(d.get("release"))))
+                except (KeyError, TypeError, ValueError):
+                    continue
             project = Project(name=name, system=system, width=w, height=h, fps=fps,
                               transparent=transparent, written_files=written, frames=frames, groups=groups,
-                              extra_colours=extra, start_state=_rule_from_json(meta.get("start_state")), file_path=str(path), dirty=False)
+                              extra_colours=extra, start_state=_rule_from_json(meta.get("start_state")), control_rules=control, file_path=str(path), dirty=False)
+            if not meta.get("palette_saved"):         # an older project: the palette keeps its old order, then is saved from now on
+                used_now = list(project._used_colours())
+                project.extra_colours = used_now + [c for c in extra if c not in used_now]
             from src.core import edit
             if meta.get("labels") == "numbered":
                 edit.renumber(project)

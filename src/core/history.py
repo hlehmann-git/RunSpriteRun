@@ -3,7 +3,7 @@ never changed in place (a palette replacement makes new images), so a snapshot k
 from __future__ import annotations
 
 import copy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from PIL import Image
 
@@ -21,18 +21,21 @@ class Snapshot:
     fps: int
     transparent: Colour
     extra_colours: tuple = ()
+    control_rules: list = field(default_factory=list)
 
     def same_as(self, other: "Snapshot") -> bool:
         return (len(self.frames) == len(other.frames)
                 and all(a[0] == b[0] and a[1] is b[1] and a[2] == b[2] and a[3] is b[3] for a, b in zip(self.frames, other.frames))
                 and self.groups == other.groups and self.start_state == other.start_state
-                and self.fps == other.fps and self.transparent == other.transparent and self.extra_colours == other.extra_colours)
+                and self.fps == other.fps and self.transparent == other.transparent and self.extra_colours == other.extra_colours
+                and self.control_rules == other.control_rules)
 
 
 def take(project: Project) -> Snapshot:
+    project.palette()                      # bring the saved palette up to date, so a snapshot holds the whole palette
     return Snapshot([(f.label, f.image, f.copied, f.layers, f.uid) for f in project.frames], copy.deepcopy(project.groups),
                     copy.deepcopy(project.start_state), project.fps, project.transparent,
-                    tuple(project.extra_colours))
+                    tuple(project.extra_colours), copy.deepcopy(project.control_rules))
 
 
 def restore(project: Project, snap: Snapshot) -> None:
@@ -42,6 +45,7 @@ def restore(project: Project, snap: Snapshot) -> None:
     project.fps = snap.fps
     project.transparent = snap.transparent
     project.extra_colours = list(snap.extra_colours)
+    project.control_rules = copy.deepcopy(snap.control_rules)
     project.dirty = True
 
 
