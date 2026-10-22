@@ -199,7 +199,7 @@ To edit a group, pick it from the list (or click one of its frames), change it a
 
 ### Keys: On Hold
 
-**A group's own key is set in the Frame Group Control window, in the Group keys rows under the rules (see below)**. While the key is held in RunSpriteRun, the group loops.
+**A group's own key is set in the Frame Group Control window, from the Group keys button at the bottom of the window (see below; this is for older projects, new projects use rules)**. While the key is held in RunSpriteRun, the group loops.
 
 - Single keys: **W, A, S, D** and **1 to 6** (the top row or the number pad).
 - Diagonals: **W+A** (up-left), **W+D** (up-right), **S+D** (down-right) and **S+A** (down-left). A diagonal is two direction keys held together, and has its own group like any key. If it has a group, it plays when both keys are held, whichever went down first.
@@ -218,26 +218,26 @@ A new group starts with Go To Frame 1. If a frame is moved, a rule that points t
 
 ### Frame Group Control: key rules
 
-The Set Rules button in the Set Frame Group panel (or Group > Frame Group Control) opens the Frame Group Control window. It works like the controller of a console game: it says which keys, held alone or together, play which group. The window stays open beside the main window, so you can keep it open while you run the animation. It is greyed out in Edit mode.
+The Set Rules button in the Set Frame Group panel (or Group > Frame Group Control) opens the Frame Group Control window. It works like the controller of a console game: it says which keys, held alone or together, play which group. It is a pop-up: nothing changes until you press Apply, and Cancel (or Esc, or the X) closes it without changes. It does not open in Edit mode. The Amiga example RickDangerous_Amiga_Example (in Examples) shows a full set of rules.
 
-The top of the window shows the controller of your system: eight directions (W, A, S, D and the four diagonals) and its fire buttons. The Atari ST, Atari STE, Amiga, Commodore 64, Apple II and Apple IIgs have 1 button (key 1), the Sega Genesis / Mega Drive has 3 (keys 1 to 3), and the SNES has 6 (keys 1 to 4 and the L and R shoulder buttons, which are keys 5 and 6). The keys you hold while RunSpriteRun is running light up on the picture.
+The window has two sections, Rules and Transitions; hold the mouse over the small (i) beside each heading for a hint. Each rule is one numbered line that reads like a sentence: Holding [keys] plays [group] [Loop or Once] only if in [Any, or some groups] release [choice]. In a narrow window the line wraps onto two. The keys box shows the buttons of your system: the Atari ST, Atari STE, Amiga, Commodore 64, Apple II and Apple IIgs have 1 button (key 1), the Sega Genesis / Mega Drive has 3 (keys 1 to 3), and the SNES has 6 (keys 1 to 4 and the L and R shoulder buttons, which are keys 5 and 6).
 
 To make a rule:
 
 1. Press + Add rule. A small box asks for the keys. Click every key that must be held together (for example W, D and 1) and press OK. The new rule goes to the top of the list.
 2. Choose the group that plays. The list holds the groups you have already made.
 3. Choose Loop (the group repeats while the keys are held) or Play once (it plays through one time).
-4. Under "When all keys are released", choose what happens when you let go: the group's own On Release rule (the default), Go To Frame, or Go to Group (Loop, Play once, or First frame only). Play once plays the group one time and then that group's own release choice applies.
+4. In the release box, choose what happens when you let go: the group's own On Release rule (the default), Go To Frame, or Go to Group (Loop, Play once, or First frame only). Play once plays the group one time and then that group's own release choice applies.
 
 How the rules work:
 
 - **The top rule wins.** Rules are checked from the top and the first rule whose keys are all held plays. Put the more specific rules higher: W+D+1 above W+D above D. Use the up and down arrows to move a rule, and the cross to delete it.
 - **Play once** plays the group one time and will not play it again until you let go of the keys. Then the next matching rule, or the group of the newest key you are holding, takes over. For example: hold D (Walk right), then press A. A rule D+A that plays TurnLeft once shows the turn, and then Walk left starts.
 - **Adding a key to a chord** works too. While W+D is held, pressing 1 as well switches to a W+D+1 rule (for example a shot), and letting go of 1 returns to the W+D group.
-- **Group keys.** Under the rules, one row for each group that has a key of its own. They apply after your rules: a diagonal beats a single key, otherwise the key pressed last wins. You can change a group's key, and its release choice (Stay on the last frame, Go To Frame or Go to Group), in these rows. A key that your system's controller does not have is marked "not on this system's controller", but still works.
-- **Changing groups.** If you rename a group, its rules follow. If you delete a group, or delete frames that leave it empty, the rules that play it are removed and the program lists them first.
+- **Group keys.** Older projects only: if a group has a key of its own, a Group keys button appears at the bottom of the window and opens a small list where you can still change that key and its release choice. They apply after your rules: a diagonal beats a single key, otherwise the key pressed last wins. A key that your system's controller does not have is marked "not on this system's controller", but still works.
+- **Changing groups.** If you rename a group, its rules follow. If you delete a group, or delete frames that leave it empty, the rules that play it are removed and the program lists them first. A row marked in red cannot work yet (for example a rule hidden under another rule with fewer keys, or a group used by both an action key and a normal rule), and Apply stays greyed out until you fix it.
 
-Every change in the window is applied at once and can be undone with Ctrl+Z. Apply, Esc and the X in the title bar all just close the window. The rules are saved in the project, and Save and Export also write them as text and JSON files (see Saving and Export).
+Press Apply to save all your changes at once; they count as one step that Ctrl+Z undoes. Cancel, Esc and the X in the title bar close the window and throw the changes away. The rules are saved in the project, and Save and Export also write them as text and JSON files (see Saving and Export).
 
 **Making a turn: Only if in.** Each rule has an "Only if in" button under its keys (the default is Any frame). Click it and tick one or more groups: the rule fires only if the frame on screen is in one of them. Ticking several groups lets one rule depend on every 'facing right' group, for example. The program has no setting for which way a character faces: it looks at the frame it is showing. This is how you make a character turn before it walks the other way.
 
@@ -253,9 +253,9 @@ If you rename a group, the Only if in lists follow it. If you delete a group, a 
 
 **Opposite keys.** A joystick cannot press opposite directions together, so neither can the keyboard here. W and S, and A and D, are never counted together and cannot be chosen for a rule or a group key (the opposite key is greyed out in the Keys held box). While you hold A, pressing D does nothing; if you let go of A while still holding D, D starts counting as a normal key. You can add W or S to A or D to make a diagonal.
 
-**Transitions.** Under the rules is a Transitions section: going FROM one group, several groups or Any group, TO a group, play a transition group ONCE first. The transition group has no key of its own. For example, going from WalkRight to WalkLeft plays TurnLeft once, then WalkLeft. A row that names the from-groups beats an Any row. Starts count too (Idle to Walk). Transitions apply when a key press changes the group; stops use the group's release choice (Go to Group, play once). Tick 'Can be interrupted' if a new key press should cut a transition short; by default it finishes first.
+**Transitions.** Under the rules is a Transitions section. A row reads: Going from [one group, several groups or Any] to [a group] play [a group] first, and the group that plays first plays once. The transition group has no key of its own. For example, going from WalkRight to WalkLeft plays TurnLeft once, then WalkLeft. A row that names the from-groups beats an Any row. Starts count too (Idle to Walk). Transitions apply when a key press changes the group; stops use the group's release choice (Go to Group, play once). Tick 'Can be interrupted' if a new key press should cut a transition short; by default it finishes first. Groups played by an action key cannot be used in transitions.
 
-**Action animations (7, 8, 9, 0).** Some animations are not played by the controller but by the game, for example a death when a character touches a spike. Keys 7, 8, 9 and 0 let you test them. They are shown apart, in amber, under the 1 to 6 buttons on the key pad and in Frame Group Control, and work on every system. Set them up like any rule: Add rule, choose the amber 7, 8, 9 or 0 in the Keys held box, choose the group, Loop or Play once, and what happens on release (for example Play once, then Go To Frame on the last frame so the last frame stays). An action key stands alone: it cannot be combined with any other key, and while it is held the controller keys are ignored.
+**Action animations (7, 8, 9, 0).** Some animations are not played by the controller but by the game, for example a death when a character touches a spike. Keys 7, 8, 9 and 0 let you test them. They are shown apart, in amber, under the 1 to 6 buttons on the key pad and in the keys box of a rule, and work on every system. Set them up like any rule: Add rule, choose 7, 8, 9 or 0 in the keys box (they stay plain until you pick one, then turn orange), then choose the group. An action rule always plays once, and its release list holds only the frames of its own group; the last frame is the default, so the last frame stays (for example for a Die group). An action key stands alone: it cannot be combined with any other key, and while it is held the controller keys are ignored. An action group is kept apart from the controls: a group played by an action key cannot be used by any other rule, in a transition or as a release target, and a frame that is needed in both must be duplicated first. The window marks any clash in red.
 
 ### Running the animation
 
@@ -544,7 +544,7 @@ Ten ready-made projects are installed in the **Examples\Projects** folder, one f
 
 **Keys do nothing in RunSpriteRun.** Make sure the key has a group, or is used by a rule in Frame Group Control, and click away from any text box.
 
-A Frame Group Control rule never plays. Rules are checked from the top, so a rule higher up that needs fewer keys (such as D) can win before a rule that needs more (such as W+D+1). Use the arrows to move the more specific rule up.
+A Frame Group Control rule never plays. Rules are checked from the top, so a rule higher up that needs fewer keys (such as D) can win before a rule that needs more (such as W+D+1). Use the arrows to move the more specific rule up. The window marks such a rule in red.
 
 **"Switch back to RunSpriteRun mode first."** Turn Edit mode off (apply or discard your changes), then save, open or export.
 
