@@ -12,13 +12,14 @@ from PySide6.QtWidgets import QAbstractSpinBox, QApplication, QComboBox, QSlider
 
 
 class WheelGuard(QObject):
-    """Stops the mouse wheel changing a drop-down, spin box or slider unless it
-    has been clicked into first. The wheel scrolls whatever is behind it."""
+    """Stops the mouse wheel changing controls by accident. A drop-down never takes the wheel, even after it has been
+    clicked (it scrolls whatever is behind it). A spin box or slider takes it only once it has been clicked into."""
 
     def eventFilter(self, obj, event):
-        if (event.type() == QEvent.Wheel
-                and isinstance(obj, (QComboBox, QAbstractSpinBox, QSlider))
-                and not obj.hasFocus()):
+        if event.type() != QEvent.Wheel:
+            return False
+        if (isinstance(obj, QComboBox)
+                or (isinstance(obj, (QAbstractSpinBox, QSlider)) and not obj.hasFocus())):
             parent = obj.parentWidget()
             if parent is not None:
                 QApplication.sendEvent(parent, event)

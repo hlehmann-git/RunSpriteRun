@@ -1,136 +1,88 @@
-"""Frame Group Control (v2.0.9): the window that says which keys play which frame group.
+"""Frame Group Control (v2.0.14): the pop-up that says which keys play which frame group.
 
-It lists the Frame Group Control rules (IF these keys are held THEN play this group), checked from the top with the first
-match winning, and under them the basic key of each group (the key set in Set Frame Group before this window existed).
-Every change is applied at once and is one Undo step. The controller picture lights the keys held while RunSpriteRun runs."""
+Rules read as one sentence each, "Holding W + 1 plays ShootRight Loop only if in Right groups release Frame 1", numbered
+from the top (the first rule that matches wins). Transitions read "Going from A to B play C first".
+The window edits a copy: Apply saves it as one Undo step, Cancel (or Esc, or the X) throws the changes away.
+Keys 7 8 9 0 are action keys: they play a group on their own for testing, and that group is used by nothing else."""
 from __future__ import annotations
 
 import copy
 
-from PySide6.QtCore import QRectF, Qt, QTimer
-from PySide6.QtGui import QColor, QFont, QPainter, QPen
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFrame, QGridLayout, QHBoxLayout, QLabel,
-                               QPushButton, QScrollArea, QVBoxLayout, QWidget)
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtWidgets import (QBoxLayout, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFrame, QGridLayout, QHBoxLayout,
+                               QLabel, QPushButton, QScrollArea, QVBoxLayout, QWidget)
 
 from src.app import messages
 from src.app.common import frame_choice_text
 from src.app.controller import Controller
 from src.app.theme import short_popup
+from src.core import groups
 from src.core.project import ControlRule, Project, Rule, Transition
-from src.core.rules import ACTION_KEYS, DIAGONALS, KEY_LABELS, OPPOSITE, buttons_for, key_available, keys_for, keys_text
+from src.core.rules import ACTION_KEYS, DIAGONALS, KEY_LABELS, OPPOSITE, buttons_for, key_available, keys_for
 
 HEADING = "color: #9aa0ae; font-size: 10px; font-weight: 700;"
-WORD = "color: #ffd24d; font-weight: 700;"
+NUMBER = "color: #d6a046; font-weight: 700;"
 GREY = "color: #9aa0ae;"
+RED = "color: #ff7b72; font-size: 11px;"
 ROW = "QFrame#row { background: #25272e; border: 1px solid #3e414a; border-radius: 6px; }"
+ROW_BAD = "QFrame#row { background: #2e2326; border: 1px solid #b5524a; border-radius: 6px; }"
 KEYS_BUTTON = ("QPushButton { background: #3780cd; border: 1px solid #78b9ff; border-radius: 5px; color: #ffffff; "
                "font-weight: 600; padding: 3px 10px; } QPushButton:hover { background: #4a90dd; }")
 ICON_BUTTON = "QPushButton { padding: 2px 6px; min-width: 18px; }"
-HELD_FILL, HELD_EDGE = QColor("#2e4838"), QColor("#6eaa7d")        # a held or chosen key: muted green fill and border
-ACTION_AMBER = QColor("#d6a046")
-KEY_FILL, KEY_EDGE = QColor("#25272e"), QColor("#4a4e5a")
+APPLY_BUTTON = KEYS_BUTTON + " QPushButton:disabled { background: #3a3e4a; border: 1px solid #50566a; color: #7a7f8c; }"
+INFO = "color: #9aa0ae; border: 1px solid #6a7080; border-radius: 7px; font-size: 9px; font-weight: 700; min-width: 14px; max-width: 14px; min-height: 14px; max-height: 14px; qproperty-alignment: AlignCenter;"
+WRAP_WIDTH = 960                                    # narrower than this, a rule goes onto two lines
 
 MSG_NO_GROUPS = "Create a frame group first. Rules choose which group plays."
+MSG_NO_FREE_GROUP = "Every group is already used on the other side. Action keys play a group that no other rule or transition uses."
 SNES_NAMES = {"1": "1", "2": "2", "3": "3", "4": "4", "5": "L", "6": "R"}      # the SNES shoulder buttons are 5 and 6
+TIPS = {
+    "rules": "Rules are checked from the top. The first rule whose keys are all held plays its group. Put a rule with more keys "
+             "(W + 1) above a rule with fewer (W).",
+    "transitions": "Going from one group to another, play a group once first. With none, the new group starts straight away.",
+}
 
 
-class ControllerPad(QWidget):
-    """The controller of the system: the 8 directions and its fire buttons. Display only: keys held while running light up."""
-
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.setFixedSize(380, 232)
-        self.system = ""
-        self.held: set[str] = set()
-        self.setAccessibleName("Controller")
-
-    def set_system(self, system: str) -> None:
-        self.system = system
-        self.update()
-
-    def set_held(self, keys) -> None:
-        self.held = set(keys)
-        self.update()
-
-    def _key(self, p: QPainter, rect: QRectF, label: str, key: str, round_: bool = False) -> None:
-        on = key in self.held
-        p.setPen(QPen(HELD_EDGE if on else KEY_EDGE, 2 if on else 1))
-        p.setBrush(HELD_FILL if on else KEY_FILL)
-        if round_:
-            p.drawEllipse(rect)
-        else:
-            p.drawRoundedRect(rect, 5, 5)
-        p.setPen(QColor("#ffffff") if on else QColor("#c9ccd6"))
-        p.drawText(rect, Qt.AlignCenter, label)
-
-    def _actions(self, p: QPainter) -> None:
-        """The Action animations row: keys 7 8 9 0, played by the game rather than the controller."""
-        p.setPen(QPen(QColor("#50566a"), 1))
-        p.drawLine(10, 166, 190, 166)
-        f = QFont(self.font())
-        f.setPixelSize(10)
-        f.setBold(True)
-        p.setFont(f)
-        p.setPen(ACTION_AMBER)
-        p.drawText(QRectF(10, 168, 180, 14), Qt.AlignLeft | Qt.AlignVCenter, "ACTION ANIMATIONS")
-        f.setPixelSize(12)
-        p.setFont(f)
-        for i, k in enumerate(ACTION_KEYS):
-            rect = QRectF(14 + i * 46, 186, 36, 36)
-            on = k in self.held
-            p.setPen(QPen(ACTION_AMBER, 3 if on else 1.5))
-            p.setBrush(QColor("#46381c") if on else KEY_FILL)
-            p.drawEllipse(rect)
-            p.setPen(QColor("#ffffff"))
-            p.drawText(rect, Qt.AlignCenter, k)
-
-    def paintEvent(self, event) -> None:
-        p = QPainter(self)
-        p.setRenderHint(QPainter.Antialiasing)
-        f = QFont(self.font())
-        f.setPixelSize(11)
-        f.setBold(True)
-        p.setFont(f)
-        cx, cy, s = 80, 90, 44
-        for key, (dx, dy) in {"W": (0, -1), "S": (0, 1), "A": (-1, 0), "D": (1, 0), "W+A": (-1, -1), "W+D": (1, -1),
-                              "S+A": (-1, 1), "S+D": (1, 1)}.items():
-            self._key(p, QRectF(cx + dx * s - 19, cy + dy * s - 19, 38, 38), key, key)
-        p.setPen(QPen(KEY_EDGE, 1))
-        p.setBrush(QColor("#1c1d22"))
-        p.drawRoundedRect(QRectF(cx - 19, cy - 19, 38, 38), 5, 5)
-        n = buttons_for(self.system)
-        if n == 6:                                                  # SNES: four face buttons in a diamond, two shoulder buttons above
-            for key, (x, y) in {"1": (310, 100), "2": (272, 126), "3": (272, 74), "4": (234, 100)}.items():
-                self._key(p, QRectF(x - 18, y - 18, 36, 36), SNES_NAMES[key], key, True)
-            self._key(p, QRectF(215, 14, 70, 26), "L (5)", "5")
-            self._key(p, QRectF(295, 14, 70, 26), "R (6)", "6")
-        else:
-            for i in range(n):
-                self._key(p, QRectF(225 + i * 50, 118 - i * 14, 38, 38), str(i + 1), str(i + 1), True)
-        self._actions(p)
+def info_label(tip: str) -> QLabel:
+    lab = QLabel("i")
+    lab.setStyleSheet(INFO)
+    lab.setToolTip(tip)
+    lab.setAlignment(Qt.AlignCenter)
+    return lab
 
 
-KEY_ON = ("QPushButton:checked { background: #2e4838; border: 2px solid #6eaa7d; color: #ffffff; }")
-ACTION_ON = ("QPushButton { border: 1px solid #d6a046; border-radius: 17px; } "
-             "QPushButton:checked { background: #46381c; border: 3px solid #d6a046; color: #ffffff; } "
-             "QPushButton:disabled { border: 1px solid #5a4a2a; color: #7a7f8c; }")
+def chip_text(keys) -> str:
+    from src.core.rules import keys_text
+    return " + ".join(keys_text(keys).split("+"))
+
+
+KEY_ON = "QPushButton:checked { background: #2e4838; border: 2px solid #6eaa7d; color: #ffffff; }"
+FIRE = "QPushButton { border: 1px solid #6a7080; border-radius: 16px; } "
+ACTION_ON = FIRE + "QPushButton:checked { background: #54421f; border: 2px solid #d6a046; color: #ffffff; }"
 
 
 class KeysDialog(QDialog):
     """Choose the keys of a rule: click each key that must be held together. The directions are laid out as a cross
     (W up, A left, D right, S down) with the four diagonals in the corners; the action keys 7 8 9 0 stand alone."""
 
-    def __init__(self, parent: QWidget, system: str, keys: list[str]) -> None:
+    def __init__(self, parent: QWidget, system: str, keys: list[str], title: str = "Keys held") -> None:
         super().__init__(parent)
-        self.setWindowTitle("Keys held")
+        self.setWindowTitle(title)
         lay = QVBoxLayout(self)
-        lay.addWidget(QLabel("Click every key that must be held together."))
+        lay.setContentsMargins(18, 14, 18, 14)
+        lay.setSpacing(6)
+        head = QLabel(title)
+        head.setStyleSheet("font-size: 13px; font-weight: 700;")
+        lay.addWidget(head)
+        hint = QLabel("Click keys to add or remove them.")
+        hint.setStyleSheet(GREY)
+        lay.addWidget(hint)
         grid = QGridLayout()
-        grid.setSpacing(6)
+        grid.setSpacing(8)
         self.buttons: dict[str, QPushButton] = {}
         self.corners: dict[str, QPushButton] = {}
 
-        def make(label: str, checked: bool, size=(54, 40)) -> QPushButton:
+        def make(label: str, checked: bool, size=(32, 24)) -> QPushButton:
             b = QPushButton(label)
             b.setCheckable(True)
             b.setChecked(checked)
@@ -140,50 +92,63 @@ class KeysDialog(QDialog):
 
         for k, (r, c) in {"W": (0, 1), "A": (1, 0), "D": (1, 2), "S": (2, 1)}.items():
             self.buttons[k] = make(k, k in keys)
-            grid.addWidget(self.buttons[k], r, c)
+            grid.addWidget(self.buttons[k], r, c, Qt.AlignCenter)
         for name, (r, c) in {"W+A": (0, 0), "W+D": (0, 2), "S+A": (2, 0), "S+D": (2, 2)}.items():
-            b = make("+", all(p in keys for p in DIAGONALS[name]))
+            b = make("+", all(p in keys for p in DIAGONALS[name]), (24, 20))
             self.corners[name] = b
             b.toggled.connect(lambda on, name=name: self._corner(name, on))
-            grid.addWidget(b, r, c)
+            grid.addWidget(b, r, c, Qt.AlignCenter)
         cross = QHBoxLayout()
         cross.addStretch(1)
         cross.addLayout(grid)
         cross.addStretch(1)
         lay.addLayout(cross)
+        lab = QLabel("BUTTONS")
+        lab.setStyleSheet(HEADING)
+        lay.addWidget(lab)
         row = QHBoxLayout()
-        row.addStretch(1)
+        row.setSpacing(12)
         for k in keys_for(system)[4:]:
-            b = make(SNES_NAMES.get(k, k) if buttons_for(system) == 6 else k, k in keys, (36, 36))
-            b.setStyleSheet("QPushButton { border: 1px solid #6a7080; border-radius: 18px; } " + KEY_ON + " QPushButton:disabled { border: 1px solid #3a3e4a; color: #7a7f8c; }")
+            b = make(SNES_NAMES.get(k, k) if buttons_for(system) == 6 else k, k in keys, (32, 32))
+            b.setStyleSheet(FIRE + KEY_ON + " QPushButton:disabled { border: 1px solid #3a3e4a; color: #7a7f8c; }")
             self.buttons[k] = b
             row.addWidget(b)
         row.addStretch(1)
         lay.addLayout(row)
-        sep = QLabel("ACTION ANIMATIONS  (choose one; it cannot be combined with any other key)")
-        sep.setStyleSheet("color: #d6a046; font-size: 10px; font-weight: bold; border-top: 1px solid #50566a; padding-top: 4px;")
+        sep = QLabel("ACTION ANIMATIONS")
+        sep.setStyleSheet("color: #d6a046; font-size: 9px; font-weight: bold; border-top: 1px solid #3e414a; padding-top: 6px;")
         lay.addWidget(sep)
         arow = QHBoxLayout()
-        arow.addStretch(1)
+        arow.setSpacing(12)
         for k in ACTION_KEYS:
-            b = make(k, k in keys, (34, 34))
-            b.setStyleSheet(ACTION_ON)
+            b = make(k, k in keys, (32, 32))
+            b.setStyleSheet(ACTION_ON + " QPushButton:disabled { border: 1px solid #3a3e4a; color: #7a7f8c; }")
             self.buttons[k] = b
             arow.addWidget(b)
         arow.addStretch(1)
         lay.addLayout(arow)
-        note = QLabel("A joystick cannot press opposite directions together: when A is chosen D is not available, and so on.")
-        note.setWordWrap(True)
-        note.setStyleSheet(GREY)
-        lay.addWidget(note)
         for k, b in self.buttons.items():
             b.toggled.connect(lambda _on, k=k: self._changed(k))
         self._guard = False
         self._changed(None)
+        foot = QHBoxLayout()
+        uses = QLabel("Uses")
+        uses.setStyleSheet(GREY)
+        foot.addWidget(uses)
+        self.preview = QLabel()
+        self.preview.setStyleSheet("background: #3780cd; border-radius: 5px; color: #ffffff; font-weight: 700; padding: 3px 8px;")
+        foot.addWidget(self.preview)
+        foot.addStretch(1)
         box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         box.accepted.connect(self._ok)
         box.rejected.connect(self.reject)
-        lay.addWidget(box)
+        foot.addWidget(box)
+        lay.addLayout(foot)
+        self._preview()
+
+    def _preview(self) -> None:
+        keys = self.keys()
+        self.preview.setText(chip_text(keys) if keys else "no key")
 
     def _corner(self, name: str, on: bool) -> None:
         """A corner "+" picks (or lets go of) both of its directions."""
@@ -210,6 +175,8 @@ class KeysDialog(QDialog):
             b.setChecked(all(self.buttons[p].isChecked() for p in DIAGONALS[name]))
         self._guard = False
         self._opposites()
+        if hasattr(self, "preview"):
+            self._preview()
 
     def _opposites(self) -> None:
         """A key whose opposite is chosen cannot be chosen; a chosen action key greys out everything else."""
@@ -232,50 +199,42 @@ class KeysDialog(QDialog):
         return [k for k in order if k in self.buttons and self.buttons[k].isChecked()]
 
 
-class ReleaseChoice(QWidget):
-    """What happens when all keys are let go: a short list of choices, with the frame or group to go to."""
-    MODES = ("frame", "loop", "once", "still")
+class ReleaseChoice(QComboBox):
+    """What happens when all keys are let go, in one drop-down: the group's own choice, a frame, or a group.
+    An action key offers only the frames of its own group."""
 
-    def __init__(self, project: Project, rule: Rule | None, none_text: str, on_change) -> None:
+    def __init__(self, project: Project, rule: Rule | None, none_text: str, on_change, only_frames_of: str | None = None) -> None:
         super().__init__()
-        lay = QHBoxLayout(self)
-        lay.setContentsMargins(0, 0, 0, 0)
-        self.mode = QComboBox()
-        self.mode.addItems([none_text, "Go To Frame", "Go to Group (loop)", "Go to Group (play once)", "Go to Group (first frame only)"])
-        self.frame = QComboBox()
-        self.group = QComboBox()
-        short_popup(self.frame)
-        short_popup(self.group)
+        short_popup(self, 12)
+        self.addItem(none_text, None)
+        labels = groups.group_frame_labels(project, only_frames_of) if only_frames_of is not None else None
         for i, f in enumerate(project.frames):
-            self.frame.addItem(frame_choice_text(i, f.label), f.label)
-        for g in project.groups:
-            self.group.addItem(g.name, g.name)
-        for w in (self.mode, self.frame, self.group):
-            lay.addWidget(w)
-        lay.addStretch(1)
-        if rule is not None and rule.kind == "frame" and self.frame.findData(rule.target) >= 0:
-            self.mode.setCurrentIndex(1)
-            self.frame.setCurrentIndex(self.frame.findData(rule.target))
-        elif rule is not None and rule.kind == "group" and self.group.findData(rule.target) >= 0:
-            self.mode.setCurrentIndex(2 if rule.loop else 3 if rule.once else 4)
-            self.group.setCurrentIndex(self.group.findData(rule.target))
-        self._show()
-        self.mode.currentIndexChanged.connect(lambda _i: (self._show(), on_change()))
-        self.frame.currentIndexChanged.connect(lambda _i: on_change())
-        self.group.currentIndexChanged.connect(lambda _i: on_change())
+            if labels is None or f.label in labels:
+                self.addItem(frame_choice_text(i, f.label), self.key_of(Rule("frame", f.label)))
+        if only_frames_of is None:
+            for g in project.groups:
+                self.addItem(f"Group {g.name} (loop)", self.key_of(Rule("group", g.name, True, False)))
+                self.addItem(f"Group {g.name} (once)", self.key_of(Rule("group", g.name, False, True)))
+                self.addItem(f"Group {g.name} (first frame)", self.key_of(Rule("group", g.name, False, False)))
+        if rule is not None:
+            data = self.key_of(rule)
+            i = self.findData(data)
+            if i < 0:                                      # points somewhere not offered: show it so the problem is visible
+                self.addItem(f"{rule.target} (not allowed here)", data)
+                i = self.count() - 1
+            self.setCurrentIndex(i)
+        self.currentIndexChanged.connect(lambda _i: on_change())
 
-    def _show(self) -> None:
-        m = self.mode.currentIndex()
-        self.frame.setVisible(m == 1)
-        self.group.setVisible(m >= 2)
+    @staticmethod
+    def key_of(rule: Rule) -> str:
+        return f"frame|{rule.target}" if rule.kind == "frame" else f"group|{rule.target}|{int(rule.loop)}|{int(rule.once)}"
 
     def rule(self) -> Rule | None:
-        m = self.mode.currentIndex()
-        if m == 1 and self.frame.count():
-            return Rule("frame", self.frame.currentData())
-        if m >= 2 and self.group.count():
-            return Rule("group", self.group.currentData(), m == 2, m == 3)
-        return None
+        d = self.currentData()
+        if d is None:
+            return None
+        kind, target, *flags = d.split("|")
+        return Rule("frame", target) if kind == "frame" else Rule("group", target, flags[0] == "1", flags[1] == "1")
 
 
 class GroupsPicker(QDialog):
@@ -305,21 +264,65 @@ class GroupsPicker(QDialog):
 
 
 def groups_text(names: list[str], empty: str) -> str:
-    return ", ".join(names) if names else empty
+    """A short summary of a list of groups for a button: Any, the name, or how many."""
+    if not names:
+        return empty
+    return names[0] if len(names) == 1 else f"{names[0]}, {len(names) - 1} more"
+
+
+class GroupKeysDialog(QDialog):
+    """Older projects can have a group with a key of its own (the group plays while that key is held, after the rules). Those
+    keys and their On Release choices are edited here, one by one; each change is applied at once and is one Undo step."""
+
+    def __init__(self, parent: QWidget, controller: Controller) -> None:
+        super().__init__(parent)
+        self.controller = controller
+        self.setWindowTitle("Group keys")
+        lay = QVBoxLayout(self)
+        note = QLabel("A group with a key of its own plays while that key is held, after the rules in Frame Group Control.")
+        note.setWordWrap(True)
+        note.setStyleSheet(GREY)
+        lay.addWidget(note)
+        p = controller.project
+        self._rc: dict[str, ReleaseChoice] = {}
+        for g in sorted((g for g in p.groups if g.key), key=lambda g: 0 if g.key in DIAGONALS else 1):
+            line = QHBoxLayout()
+            key = QComboBox()
+            key.addItem("None", None)
+            for k in list(keys_for(p.system.name)[:4]) + list(DIAGONALS) + [k for k in keys_for(p.system.name) if k.isdigit()]:
+                key.addItem(KEY_LABELS.get(k, k), k)
+            if not key_available(p.system.name, g.key):
+                key.addItem(f"{g.key}  (not on this system's controller)", g.key)
+            key.setCurrentIndex(max(0, key.findData(g.key)))
+            key.currentIndexChanged.connect(lambda _x, n=g.name, c=key: controller.set_group_key(n, c.currentData()))
+            line.addWidget(key)
+            line.addWidget(QLabel(f"held plays <b>{g.name}</b>, on release"))
+            rc = ReleaseChoice(p, g.on_release, "Stay on last frame", lambda: None)
+            rc.currentIndexChanged.connect(lambda _x, n=g.name: controller.set_group_release(n, self._rc[n].rule()))
+            self._rc[g.name] = rc
+            line.addWidget(rc)
+            lay.addLayout(line)
+        close = QPushButton("Close")
+        close.clicked.connect(self.accept)
+        lay.addWidget(close, 0, Qt.AlignRight)
 
 
 class ControlWindow(QDialog):
-    """The Frame Group Control window. It stays open beside the main window (it is not modal)."""
+    """The Frame Group Control window. It is modal and edits a copy of the rules and transitions: Apply saves them as one
+    Undo step; Cancel, Esc and the X in the title bar close it with no change."""
 
     def __init__(self, parent: QWidget, controller: Controller) -> None:
         super().__init__(parent)
         self.controller = controller
         self.setWindowTitle("Frame Group Control")
-        self.setModal(False)
-        self.resize(900, 640)
-        self.setMinimumSize(760, 480)
+        self.setModal(True)
+        self.resize(1040, 640)
+        self.setMinimumSize(700, 420)
+        self.d_rules: list[ControlRule] = []
+        self.d_trans: list[Transition] = []
         self._pending = False
-        self.setWindowFlag(Qt.WindowCloseButtonHint, False)
+        self._rows: dict[tuple[str, int], tuple[QFrame, QLabel]] = {}
+        self._wrapping: list[QBoxLayout] = []
         lay = QVBoxLayout(self)
         title = QLabel("Frame Group Control")
         title.setStyleSheet("font-size: 15px; font-weight: 700;")
@@ -327,24 +330,6 @@ class ControlWindow(QDialog):
         self.subtitle = QLabel()
         self.subtitle.setStyleSheet(GREY)
         lay.addWidget(self.subtitle)
-        top = QHBoxLayout()
-        self.pad = ControllerPad()
-        top.addWidget(self.pad)
-        self.caption = QLabel("The keys you hold while RunSpriteRun runs light up here.\n"
-                              "Rules are checked from the top. The first rule whose keys are all held plays its group.")
-        self.caption.setWordWrap(True)
-        self.caption.setStyleSheet(GREY)
-        top.addWidget(self.caption, 1)
-        lay.addLayout(top)
-        head = QHBoxLayout()
-        h = QLabel("RULES")
-        h.setStyleSheet(HEADING)
-        head.addWidget(h)
-        head.addStretch(1)
-        self.add_btn = QPushButton("+ Add rule")
-        self.add_btn.clicked.connect(self._add_rule)
-        head.addWidget(self.add_btn)
-        lay.addLayout(head)
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
         self.scroll.setFrameShape(QFrame.NoFrame)
@@ -355,41 +340,59 @@ class ControlWindow(QDialog):
         self.rows.setSpacing(6)
         self.scroll.setWidget(self.holder)
         foot = QHBoxLayout()
-        note = QLabel("Changes take effect straight away. Press Apply to close this window.")
-        note.setStyleSheet(GREY)
-        foot.addWidget(note)
-        foot.addStretch(1)
+        self.note = QLabel()
+        self.note.setStyleSheet(RED)
+        foot.addWidget(self.note, 1)
+        self.keys_btn = QPushButton("Group keys…")
+        self.keys_btn.setToolTip("Older projects only: groups that have a key of their own")
+        self.keys_btn.clicked.connect(self._group_keys)
+        foot.addWidget(self.keys_btn)
+        self.cancel_btn = QPushButton("Cancel")
+        self.cancel_btn.setAutoDefault(False)
+        self.cancel_btn.setMinimumWidth(100)
+        self.cancel_btn.clicked.connect(self.reject)
+        foot.addWidget(self.cancel_btn)
         self.apply_btn = QPushButton("Apply")
-        self.apply_btn.setStyleSheet(KEYS_BUTTON)
-        self.apply_btn.setDefault(False)
+        self.apply_btn.setStyleSheet(APPLY_BUTTON)
         self.apply_btn.setAutoDefault(False)
         self.apply_btn.setMinimumWidth(110)
         self.apply_btn.clicked.connect(self._apply)
         foot.addWidget(self.apply_btn)
         lay.addLayout(foot)
+        controller.project_changed.connect(lambda *_a: self.reject())      # a different project: nothing here applies to it
 
-        controller.project_changed.connect(self._later)
-        controller.frames_changed.connect(self._later)
-        controller.keys_held.connect(self.pad.set_held)
-        controller.add_mode_changed.connect(self._enable)
-        controller.edit.changed.connect(self._enable)
+    # ---- opening and closing --------------------------------------------------------------------
+    def load(self) -> None:
+        """Start from the rules and transitions of the open project."""
+        p = self.project
+        self.d_rules = copy.deepcopy(p.control_rules) if p is not None else []
+        self.d_trans = copy.deepcopy(p.transitions) if p is not None else []
         self.rebuild()
 
-    # ---- closing: Apply, Esc and the X all do the same: close (changes are already applied) ------------
+    def _group_keys(self) -> None:
+        GroupKeysDialog(self, self.controller).exec()
+
     def _apply(self) -> None:
-        self.hide()
-
-    def reject(self) -> None:                       # Esc
-        self._apply()
-
-    def closeEvent(self, event) -> None:            # the X in the title bar
-        event.accept()
+        p = self.project
+        if p is None or self._problems():
+            return
+        rules = copy.deepcopy(self.d_rules)
+        for r in rules:
+            if any(k in ACTION_KEYS for k in r.keys):
+                r.once = True                                      # an action key plays its group once
+        if self.controller.set_rules_and_transitions(rules, copy.deepcopy(self.d_trans)):
+            self.accept()
 
     # ---- state ----------------------------------------------------------------------------------
-    def _enable(self, *_args) -> None:
-        self.setEnabled(not self.controller.add_mode and not self.controller.edit.mode)
+    @property
+    def project(self) -> Project | None:
+        return self.controller.project
 
-    def _later(self, *_args) -> None:
+    def _problems(self) -> dict:
+        p = self.project
+        return groups.rule_problems(p, self.d_rules, self.d_trans) if p is not None else {}
+
+    def _later(self) -> None:
         """Rebuild after the signal that asked for it has finished (a row must not be deleted while its own signal is running)."""
         if not self._pending:
             self._pending = True
@@ -399,290 +402,253 @@ class ControlWindow(QDialog):
         self._pending = False
         self.rebuild()
 
-    @property
-    def project(self) -> Project | None:
-        return self.controller.project
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._wrap()
+
+    def _wrap(self) -> None:
+        d = QBoxLayout.TopToBottom if self.width() < WRAP_WIDTH else QBoxLayout.LeftToRight
+        for lay in self._wrapping:
+            lay.setDirection(d)
+
+    def _mark(self) -> None:
+        """Show what is wrong in red under each row and allow Apply only when nothing is."""
+        bad = self._problems()
+        for key, (row, note) in self._rows.items():
+            msg = bad.get(key)
+            row.setStyleSheet(ROW_BAD if msg else ROW)
+            note.setText(msg or "")
+            note.setVisible(bool(msg))
+        self.apply_btn.setEnabled(not bad)
+        self.note.setText("Fix the rows marked in red to apply." if bad else "")
 
     def rebuild(self) -> None:
-        self._rc: dict[int, ReleaseChoice] = {}
-        self._from: dict[int, QPushButton] = {}
-        self._tr: dict[int, dict] = {}
-        self._key_rc: dict[str, ReleaseChoice] = {}
+        self._rows = {}
+        self._wrapping = []
         while self.rows.count():
             item = self.rows.takeAt(0)
             if item.widget() is not None:
                 item.widget().deleteLater()
         p = self.project
-        self.add_btn.setEnabled(p is not None)
         if p is None:
             self.subtitle.setText("No project open")
             return
-        self.pad.set_system(p.system.name)
+        self.keys_btn.setVisible(any(g.key for g in p.groups))      # only older projects have group keys
         n = buttons_for(p.system.name)
-        self.subtitle.setText(f"{p.name}  ·  {p.system.name} controller: 8 directions and {n} fire button{'s' if n != 1 else ''}")
-        for i in range(len(p.control_rules)):
+        self.subtitle.setText(f"{p.name}  ·  {p.system.name}: 8 directions and {n} fire button{'s' if n != 1 else ''}.   "
+                              "Rules are checked from the top. Changes are saved when you press Apply.")
+        self.rows.addWidget(self._heading("RULES", TIPS["rules"], "+ Add rule", self._add_rule))
+        for i in range(len(self.d_rules)):
             self.rows.addWidget(self._rule_row(i))
-        if not p.control_rules:
-            hint = QLabel("No rules yet. Use + Add rule, for example W+D held plays WalkUpRight, or W+D+1 plays a shot.")
-            hint.setStyleSheet(GREY)
-            hint.setWordWrap(True)
-            self.rows.addWidget(hint)
-        self._transition_section(p)
-        keyed = sorted((g for g in p.groups if g.key), key=lambda g: 0 if g.key in DIAGONALS else 1)
-        head = QLabel("GROUP KEYS  (the key of each group, set here; they apply after the rules above. "
-                      "A diagonal beats a single key, otherwise the key pressed last wins)")
-        head.setStyleSheet(HEADING)
-        head.setWordWrap(True)
-        self.rows.addSpacing(8)
-        self.rows.addWidget(head)
-        for g in keyed:
-            self.rows.addWidget(self._key_row(g.name))
-        if not keyed:
-            none = QLabel("No group has a key of its own.")
-            none.setStyleSheet(GREY)
-            self.rows.addWidget(none)
+        self.rows.addSpacing(10)
+        self.rows.addWidget(self._heading("TRANSITIONS", TIPS["transitions"], "+ Add transition", self._add_transition))
+        for i in range(len(self.d_trans)):
+            self.rows.addWidget(self._transition_row(i))
         self.rows.addStretch(1)
-        self._enable()
+        self._wrap()
+        self._mark()
+
+    def _heading(self, text: str, tip: str, add_text: str, add_fn) -> QWidget:
+        w = QWidget()
+        line = QHBoxLayout(w)
+        line.setContentsMargins(0, 0, 0, 0)
+        h = QLabel(text)
+        h.setStyleSheet(HEADING)
+        line.addWidget(h)
+        line.addWidget(info_label(tip))
+        line.addStretch(1)
+        b = QPushButton(add_text)
+        b.clicked.connect(lambda _c=False: add_fn())
+        b.setEnabled(self.project is not None)
+        line.addWidget(b)
+        if text == "RULES":
+            self.add_btn = b
+        else:
+            self.add_tr_btn = b
+        return w
 
     # ---- rows -----------------------------------------------------------------------------------
-    def _row_frame(self) -> tuple[QFrame, QVBoxLayout]:
+    def _row_shell(self, key: tuple[str, int]) -> tuple[QFrame, QBoxLayout, QBoxLayout, QBoxLayout]:
+        """A framed row: its sentence in two halves that sit side by side, or one above the other in a narrow window."""
         row = QFrame()
         row.setObjectName("row")
         row.setStyleSheet(ROW)
         v = QVBoxLayout(row)
-        v.setContentsMargins(10, 8, 10, 8)
-        v.setSpacing(6)
-        return row, v
+        v.setContentsMargins(10, 6, 10, 6)
+        v.setSpacing(2)
+        both = QBoxLayout(QBoxLayout.LeftToRight)
+        both.setSpacing(8)
+        first, second = QHBoxLayout(), QHBoxLayout()
+        first.setSpacing(6)
+        second.setSpacing(6)
+        both.addLayout(first)
+        both.addLayout(second, 1)
+        v.addLayout(both)
+        note = QLabel()
+        note.setStyleSheet(RED)
+        note.setWordWrap(True)
+        note.setVisible(False)
+        v.addWidget(note)
+        self._rows[key] = (row, note)
+        self._wrapping.append(both)
+        return row, first, second, both
 
-    def _group_combo(self, current: str) -> QComboBox:
+    @staticmethod
+    def _word(text: str, style: str = GREY) -> QLabel:
+        lab = QLabel(text)
+        lab.setStyleSheet(style)
+        return lab
+
+    def _names(self, only: str) -> list[str]:
+        """The groups a row may offer: "action" = groups no normal rule or transition uses; "control" = groups no action key plays."""
+        action = groups.action_groups(self.d_rules)
+        normal = {r.group for r in self.d_rules if not any(k in ACTION_KEYS for k in r.keys)}
+        for t in self.d_trans:
+            normal.update([t.to, t.play, *t.from_groups])
+        for r in self.d_rules:
+            normal.update(r.only_in)
+        names = [g.name for g in self.project.groups]
+        return [n for n in names if (n not in normal if only == "action" else n not in action)]
+
+    def _group_combo(self, current: str, only: str) -> QComboBox:
         c = QComboBox()
         short_popup(c)
-        for g in self.project.groups:
-            c.addItem(g.name, g.name)
+        names = self._names(only)
+        if current not in names:
+            names.append(current)
+        for n in names:
+            c.addItem(n, n)
         c.setCurrentIndex(max(0, c.findData(current)))
         return c
 
     def _rule_row(self, i: int) -> QWidget:
         p = self.project
-        r = p.control_rules[i]
-        row, v = self._row_frame()
-        line = QHBoxLayout()
-        word = QLabel("IF" if i == 0 else "ELSE IF")
-        word.setStyleSheet(WORD)
-        word.setMinimumWidth(56)
-        line.addWidget(word)
-        keys = QPushButton(keys_text(r.keys))
+        r = self.d_rules[i]
+        is_action = any(k in ACTION_KEYS for k in r.keys)
+        row, a, b, _both = self._row_shell(("rule", i))
+        a.addWidget(self._word(f"{i + 1}", NUMBER))
+        a.addWidget(self._word("Holding"))
+        keys = QPushButton(chip_text(r.keys))
         keys.setStyleSheet(KEYS_BUTTON)
         keys.setToolTip("Click to choose the keys that must be held together")
         keys.clicked.connect(lambda _c=False, i=i: self._choose_keys(i))
-        line.addWidget(keys)
-        line.addWidget(QLabel("held   THEN play"))
-        grp = self._group_combo(r.group)
+        a.addWidget(keys)
+        a.addWidget(self._word("plays"))
+        grp = self._group_combo(r.group, "action" if is_action else "control")
         grp.currentIndexChanged.connect(lambda _x, i=i, c=grp: self._edit(i, group=c.currentData()))
-        line.addWidget(grp)
+        a.addWidget(grp)
         mode = QComboBox()
-        mode.addItems(["Loop", "Play once"])
-        mode.setCurrentIndex(1 if r.once else 0)
+        mode.addItems(["Loop", "Once"])
+        mode.setCurrentIndex(1 if (r.once or is_action) else 0)
+        mode.setEnabled(not is_action)
+        if is_action:
+            mode.setToolTip("An action key plays its group once")
         mode.currentIndexChanged.connect(lambda _x, i=i, c=mode: self._edit(i, once=c.currentIndex() == 1))
-        line.addWidget(mode)
-        line.addStretch(1)
+        a.addWidget(mode)
+        if not is_action:
+            b.addWidget(self._word("only if in"))
+            frm = QPushButton(groups_text(r.only_in, "Any") + "  ▾")
+            frm.setToolTip("The rule only fires while the frame on screen is in one of these groups. Tick every group in which the "
+                           "character faces the same way, for example IdleLeft, WalkLeft and CrouchLeft for a FireLeft rule.")
+            frm.clicked.connect(lambda _c=False, i=i: self._pick_only_in(i))
+            b.addWidget(frm)
+        b.addWidget(self._word("release"))
+        rc = ReleaseChoice(p, r.release, "Stay on last frame" if is_action else "Group default",
+                           lambda i=i: None, only_frames_of=r.group if is_action else None)
+        rc.currentIndexChanged.connect(lambda _x, i=i, c=rc: self._edit(i, release=c.rule()))
+        b.addWidget(rc)
+        b.addStretch(1)
         for text, tip, fn, on in (("▲", "Move up", lambda _c=False, i=i: self._move(i, -1), i > 0),
-                                  ("▼", "Move down", lambda _c=False, i=i: self._move(i, 1), i < len(p.control_rules) - 1),
+                                  ("▼", "Move down", lambda _c=False, i=i: self._move(i, 1), i < len(self.d_rules) - 1),
                                   ("✕", "Delete rule", lambda _c=False, i=i: self._delete(i), True)):
-            b = QPushButton(text)
-            b.setToolTip(tip)
-            b.setStyleSheet(ICON_BUTTON)
-            b.setEnabled(on)
-            b.clicked.connect(fn)
-            line.addWidget(b)
-        v.addLayout(line)
-        cond = QHBoxLayout()
-        clab = QLabel("Only if in:")
-        clab.setStyleSheet(GREY)
-        cond.addWidget(clab)
-        frm = QPushButton(groups_text(r.only_in, "Any frame") + "  ▾")
-        frm.setToolTip("The rule only fires while the frame on screen is in one of these groups. Tick every group in which the character "
-                       "faces the same way, for example IdleLeft, WalkLeft and CrouchLeft for a FireLeft rule.")
-        frm.clicked.connect(lambda _c=False, i=i: self._pick_only_in(i))
-        self._from[i] = frm
-        cond.addWidget(frm)
-        cond.addStretch(1)
-        v.addLayout(cond)
-        second = QHBoxLayout()
-        lab = QLabel("When all keys are released:")
-        lab.setStyleSheet(GREY)
-        second.addWidget(lab)
-        rc = ReleaseChoice(p, r.release, "Use the group's On Release", lambda i=i: self._release_changed(i))
-        self._rc[i] = rc
-        second.addWidget(rc, 1)
-        v.addLayout(second)
+            btn = QPushButton(text)
+            btn.setToolTip(tip)
+            btn.setStyleSheet(ICON_BUTTON)
+            btn.setEnabled(on)
+            btn.clicked.connect(fn)
+            b.addWidget(btn)
         return row
 
-    def _key_row(self, name: str) -> QWidget:
-        p = self.project
-        g = next(x for x in p.groups if x.name == name)
-        row, v = self._row_frame()
-        line = QHBoxLayout()
-        word = QLabel("KEY")
-        word.setStyleSheet(WORD)
-        word.setMinimumWidth(56)
-        line.addWidget(word)
-        key = QComboBox()
-        key.addItem("None", None)
-        options = list(keys_for(p.system.name)[:4]) + list(DIAGONALS) + [k for k in keys_for(p.system.name) if k.isdigit()]
-        for k in options:
-            key.addItem(KEY_LABELS.get(k, k), k)
-        if not key_available(p.system.name, g.key):               # a button the system's controller does not have
-            key.addItem(f"{g.key}  (not on this system's controller)", g.key)
-        key.setCurrentIndex(max(0, key.findData(g.key)))
-        key.currentIndexChanged.connect(lambda _x, n=name, c=key: self.controller.set_group_key(n, c.currentData()))
-        line.addWidget(key)
-        line.addWidget(QLabel("held   THEN play"))
-        line.addWidget(QLabel(f"<b>{name}</b>"))
-        loop = QLabel("Loop")
-        loop.setStyleSheet(GREY)
-        line.addWidget(loop)
-        line.addStretch(1)
-        v.addLayout(line)
-        second = QHBoxLayout()
-        lab = QLabel("When all keys are released:")
-        lab.setStyleSheet(GREY)
-        second.addWidget(lab)
-        rc = ReleaseChoice(p, g.on_release, "Stay on the last frame",
-                           lambda n=name: self.controller.set_group_release(n, self._key_rc[n].rule()))
-        self._key_rc[name] = rc
-        second.addWidget(rc, 1)
-        v.addLayout(second)
-        return row
-
-    # ---- transitions ----------------------------------------------------------------------------
-    def _transition_section(self, p: Project) -> None:
-        head = QHBoxLayout()
-        h = QLabel("TRANSITIONS")
-        h.setStyleSheet(HEADING)
-        head.addWidget(h)
-        sub = QLabel("going from one group to another, play a group once first (it has no key of its own)")
-        sub.setStyleSheet(GREY)
-        head.addWidget(sub, 1)
-        self.add_tr_btn = QPushButton("+ Add transition")
-        self.add_tr_btn.clicked.connect(self._add_transition)
-        head.addWidget(self.add_tr_btn)
-        wrap = QWidget()
-        wrap.setLayout(head)
-        self.rows.addSpacing(8)
-        self.rows.addWidget(wrap)
-        for i, t in enumerate(p.transitions):
-            self.rows.addWidget(self._transition_row(i, t))
-        if not p.transitions:
-            hint = QLabel("No transitions. With none, a group starts straight away. Example: going from WalkRight to WalkLeft plays TurnLeft "
-                          "once first. A row naming a group beats a row for any group.")
-            hint.setStyleSheet(GREY)
-            hint.setWordWrap(True)
-            self.rows.addWidget(hint)
-
-    def _transition_row(self, i: int, t: Transition) -> QWidget:
-        p = self.project
-        row, v = self._row_frame()
-        line = QHBoxLayout()
-        word = QLabel("FROM")
-        word.setStyleSheet(WORD)
-        word.setMinimumWidth(56)
-        line.addWidget(word)
-        frm = QPushButton(groups_text(t.from_groups, "Any group") + "  ▾")
+    def _transition_row(self, i: int) -> QWidget:
+        t = self.d_trans[i]
+        row, a, b, _both = self._row_shell(("transition", i))
+        a.addWidget(self._word("Going from"))
+        frm = QPushButton(groups_text(t.from_groups, "Any") + "  ▾")
         frm.setToolTip("Click to tick the groups this applies to; none ticked means any group")
         frm.clicked.connect(lambda _c=False, i=i: self._pick_from(i))
-        line.addWidget(frm)
-        line.addWidget(QLabel("  going TO"))
-        to = self._group_combo(t.to)
+        a.addWidget(frm)
+        a.addWidget(self._word("to"))
+        to = self._group_combo(t.to, "control")
         to.currentIndexChanged.connect(lambda _x, i=i, c=to: self._edit_transition(i, to=c.currentData()))
-        line.addWidget(to)
-        line.addWidget(QLabel("  play first (once)"))
-        play = self._group_combo(t.play)
+        a.addWidget(to)
+        b.addWidget(self._word("play"))
+        play = self._group_combo(t.play, "control")
         play.currentIndexChanged.connect(lambda _x, i=i, c=play: self._edit_transition(i, play=c.currentData()))
-        line.addWidget(play)
+        b.addWidget(play)
+        b.addWidget(self._word("first"))
         irq = QCheckBox("Can be interrupted")
         irq.setChecked(t.interruptible)
         irq.setToolTip("Off: it always plays through. On: a change of keys while it plays stops it at once.")
-        irq.toggled.connect(lambda on, i=i: self._edit_transition(i, interruptible=bool(on)))
-        line.addWidget(irq)
-        line.addStretch(1)
-        b = QPushButton("✕")
-        b.setToolTip("Delete transition")
-        b.setStyleSheet(ICON_BUTTON)
-        b.clicked.connect(lambda _c=False, i=i: self._delete_transition(i))
-        line.addWidget(b)
-        v.addLayout(line)
-        self._tr[i] = {"from": frm, "to": to, "play": play, "interruptible": irq}
+        irq.toggled.connect(lambda on, i=i: self._edit_transition(i, interruptible=bool(on), rebuild=False))
+        b.addWidget(irq)
+        b.addStretch(1)
+        x = QPushButton("✕")
+        x.setToolTip("Delete transition")
+        x.setStyleSheet(ICON_BUTTON)
+        x.clicked.connect(lambda _c=False, i=i: self._delete_transition(i))
+        b.addWidget(x)
         return row
 
-    def _transitions_copy(self) -> list[Transition]:
-        return copy.deepcopy(self.project.transitions)
-
-    def _edit_transition(self, i: int, **fields) -> None:
-        ts = self._transitions_copy()
+    # ---- changes to the copy ----------------------------------------------------------------------
+    def _edit(self, i: int, **fields) -> None:
         for k, val in fields.items():
-            setattr(ts[i], k, val)
-        self.controller.set_transitions(ts)
+            setattr(self.d_rules[i], k, val)
+        self._later()
+
+    def _edit_transition(self, i: int, rebuild: bool = True, **fields) -> None:
+        for k, val in fields.items():
+            setattr(self.d_trans[i], k, val)
+        if rebuild:
+            self._later()
+        else:
+            self._mark()
 
     def _pick_from(self, i: int) -> None:
-        names = [g.name for g in self.project.groups]
-        dlg = GroupsPicker(self, names, list(self.project.transitions[i].from_groups), "From groups",
+        dlg = GroupsPicker(self, self._names("control"), list(self.d_trans[i].from_groups), "From groups",
                            "Tick the groups the character may be in. Tick none for any group.")
         if dlg.exec() == QDialog.Accepted:
             self._edit_transition(i, from_groups=dlg.chosen())
 
-    def _delete_transition(self, i: int) -> None:
-        ts = self._transitions_copy()
-        del ts[i]
-        self.controller.set_transitions(ts)
-
-    def _add_transition(self) -> None:
-        p = self.project
-        if p is None:
-            return
-        if len(p.groups) < 2:
-            messages.warn(self, "Create at least two frame groups first. A transition goes to one group and plays another first.")
-            return
-        ts = self._transitions_copy()
-        ts.append(Transition([], p.groups[0].name, p.groups[1].name))
-        self.controller.set_transitions(ts)
-
     def _pick_only_in(self, i: int) -> None:
-        names = [g.name for g in self.project.groups]
-        dlg = GroupsPicker(self, names, list(self.project.control_rules[i].only_in), "Only if in",
+        dlg = GroupsPicker(self, self._names("control"), list(self.d_rules[i].only_in), "Only if in",
                            "The rule only fires while the frame on screen is in one of the ticked groups. Tick none for any frame.")
         if dlg.exec() == QDialog.Accepted:
             self._edit(i, only_in=dlg.chosen())
 
-    # ---- changes (each is one Undo step) ---------------------------------------------------------
-    def _rules_copy(self) -> list[ControlRule]:
-        return copy.deepcopy(self.project.control_rules)
-
-    def _edit(self, i: int, **fields) -> None:
-        rules = self._rules_copy()
-        for k, val in fields.items():
-            setattr(rules[i], k, val)
-        self.controller.set_control_rules(rules)
-
-    def _release_changed(self, i: int) -> None:
-        self._edit(i, release=self._rc[i].rule())
-
     def _choose_keys(self, i: int) -> None:
-        dlg = KeysDialog(self, self.project.system.name, list(self.project.control_rules[i].keys))
-        if dlg.exec() == QDialog.Accepted:
-            self._edit(i, keys=dlg.keys())
+        r = self.d_rules[i]
+        dlg = KeysDialog(self, self.project.system.name, list(r.keys), f"Keys for rule {i + 1}")
+        if dlg.exec() != QDialog.Accepted:
+            return
+        keys = dlg.keys()
+        was_action = any(k in ACTION_KEYS for k in r.keys)
+        now_action = any(k in ACTION_KEYS for k in keys)
+        r.keys = keys
+        if now_action and not was_action:
+            r.once, r.release, r.only_in = True, None, []
+        elif was_action and not now_action:
+            r.release = None
+        self._later()
 
     def _move(self, i: int, delta: int) -> None:
-        rules = self._rules_copy()
         j = i + delta
-        if 0 <= j < len(rules):
-            rules[i], rules[j] = rules[j], rules[i]
-            self.controller.set_control_rules(rules)
+        if 0 <= j < len(self.d_rules):
+            self.d_rules[i], self.d_rules[j] = self.d_rules[j], self.d_rules[i]
+            self._later()
 
     def _delete(self, i: int) -> None:
-        rules = self._rules_copy()
-        del rules[i]
-        self.controller.set_control_rules(rules)
+        del self.d_rules[i]
+        self._later()
 
     def _add_rule(self) -> None:
         p = self.project
@@ -691,9 +657,30 @@ class ControlWindow(QDialog):
         if not p.groups:
             messages.warn(self, MSG_NO_GROUPS)
             return
-        dlg = KeysDialog(self, p.system.name, [])
+        dlg = KeysDialog(self, p.system.name, [], "Keys for the new rule")
         if dlg.exec() != QDialog.Accepted:
             return
-        rules = self._rules_copy()
-        rules.insert(0, ControlRule(dlg.keys(), p.groups[0].name))      # a new rule goes to the top: more specific rules should come first
-        self.controller.set_control_rules(rules)
+        keys = dlg.keys()
+        is_action = any(k in ACTION_KEYS for k in keys)
+        free = self._names("action" if is_action else "control")
+        if not free:
+            messages.warn(self, MSG_NO_FREE_GROUP)
+            return
+        # a new rule goes to the top: more specific rules should come first
+        self.d_rules.insert(0, ControlRule(keys, free[0], once=is_action))
+        self._later()
+
+    def _add_transition(self) -> None:
+        p = self.project
+        names = self._names("control")
+        if p is None:
+            return
+        if len(names) < 2:
+            messages.warn(self, "Create at least two frame groups first. A transition goes to one group and plays another first.")
+            return
+        self.d_trans.append(Transition([], names[0], names[1]))
+        self._later()
+
+    def _delete_transition(self, i: int) -> None:
+        del self.d_trans[i]
+        self._later()

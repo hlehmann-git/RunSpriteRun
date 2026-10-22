@@ -130,9 +130,11 @@ def test_the_window_has_the_drop_down_and_a_change_is_applied(app, monkeypatch):
     w.set_project(make())
     w.show_control_window()
     win = w.control_window
-    win.rebuild()
-    assert win._from[0].text().startswith("WalkRight") and win._from[1].text().startswith("Any frame")
+    from PySide6.QtWidgets import QPushButton
+    row = win._rows[("rule", 0)][0]
+    assert any(b.text().startswith("WalkRight") for b in row.findChildren(QPushButton))
     win._edit(0, only_in=["WalkLeft", "TurnLeft"])
+    win.apply_btn.click()
     assert w.controller.project.control_rules[0].only_in == ["WalkLeft", "TurnLeft"]
     w.controller.undo()
     assert w.controller.project.control_rules[0].only_in == ["WalkRight"]

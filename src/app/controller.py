@@ -289,6 +289,20 @@ class Controller(QObject):
         self.frames_changed.emit()
         return True
 
+    def set_rules_and_transitions(self, rules, transitions) -> bool:
+        """Replace the Frame Group Control rules and transitions together: one Undo step (the Apply of the Frame Group Control window)."""
+        assert self.project is not None
+        try:
+            before = self.checkpoint()
+            groups.set_control_rules(self.project, rules)
+            groups.set_transitions(self.project, transitions)
+        except groups.GroupError as e:
+            messages.warn(self.parent_widget, str(e))
+            return False
+        self.commit(before)
+        self.frames_changed.emit()
+        return True
+
     def set_group_key(self, name: str, key) -> bool:
         """The basic key of a group, edited in the Frame Group Control window. A key another group uses is moved after asking."""
         assert self.project is not None

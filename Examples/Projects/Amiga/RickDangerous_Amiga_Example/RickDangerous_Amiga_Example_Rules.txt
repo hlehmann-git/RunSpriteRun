@@ -1,0 +1,32 @@
+RunSpriteRun rules	RickDangerous_Amiga_Example	Amiga	6 fps	24 x 21
+
+Priority	Source	Keys	Only if in	Plays	Mode	When released
+1	Frame Group Control	W+1	walkright, CrouchRight, JumpRight, ShootRight, ProdRight	ShootRight	Loop	Go To Frame Rick_001
+2	Frame Group Control	W+1	walkLeft, CrouchLeft, JumpLeft, ShootLeft, ProdLeft	ShootLeft	Loop	Go To Frame Rick_013
+3	Frame Group Control	A+1		ProdLeft	Loop	Go To Frame Rick_013
+4	Frame Group Control	D+1		ProdRight	Loop	Go To Frame Rick_001
+5	Frame Group Control	W+D		JumpRight	Loop	Go To Frame Rick_001
+6	Frame Group Control	W+A		JumpLeft	Loop	Go To Frame Rick_013
+7	Frame Group Control	S+D		CrouchRight	Loop	Go To Frame Rick_001
+8	Frame Group Control	A+S		CrouchLeft	Loop	Go To Frame Rick_013
+9	Frame Group Control	W	walkright, CrouchRight, JumpRight, ShootRight, ProdRight	JumpRight	Loop	Go To Frame Rick_001
+10	Frame Group Control	W	walkLeft, CrouchLeft, JumpLeft, ShootLeft, ProdLeft	JumpLeft	Loop	Go To Frame Rick_013
+11	Frame Group Control	S	walkright, CrouchRight, JumpRight, ShootRight, ProdRight	CrouchRight	Loop	Go To Frame Rick_001
+12	Frame Group Control	S	walkLeft, CrouchLeft, JumpLeft, ShootLeft, ProdLeft	CrouchLeft	Loop	Go To Frame Rick_013
+13	Frame Group Control	D		walkright	Loop	Go To Frame Rick_001
+14	Frame Group Control	A		walkLeft	Loop	Go To Frame Rick_013
+15	Frame Group Control	7		Die	Play once	Go To Frame Rick_024
+
+Group	First frame	Last frame	Frames	First label	Last label	Key	Sprite sheet
+walkright	1	5	5	Rick_001	Rick_005		RickDangerous_Amiga_Example_walkright_SpriteSheet.png
+CrouchRight	6	7	2	Rick_006	Rick_007		RickDangerous_Amiga_Example_CrouchRight_SpriteSheet.png
+JumpRight	8	8	1	Rick_008	Rick_008		RickDangerous_Amiga_Example_JumpRight_SpriteSheet.png
+ShootRight	9	9	1	Rick_009	Rick_009		RickDangerous_Amiga_Example_ShootRight_SpriteSheet.png
+ProdRight	10	10	1	Rick_010	Rick_010		RickDangerous_Amiga_Example_ProdRight_SpriteSheet.png
+Climb	11	12	2	Rick_011	Rick_012		RickDangerous_Amiga_Example_Climb_SpriteSheet.png
+walkLeft	13	17	5	Rick_013	Rick_017		RickDangerous_Amiga_Example_walkLeft_SpriteSheet.png
+CrouchLeft	18	19	2	Rick_018	Rick_019		RickDangerous_Amiga_Example_CrouchLeft_SpriteSheet.png
+JumpLeft	20	20	1	Rick_020	Rick_020		RickDangerous_Amiga_Example_JumpLeft_SpriteSheet.png
+ShootLeft	21	21	1	Rick_021	Rick_021		RickDangerous_Amiga_Example_ShootLeft_SpriteSheet.png
+ProdLeft	22	22	1	Rick_022	Rick_022		RickDangerous_Amiga_Example_ProdLeft_SpriteSheet.png
+Die	23	24	2	Rick_023	Rick_024		RickDangerous_Amiga_Example_Die_SpriteSheet.png

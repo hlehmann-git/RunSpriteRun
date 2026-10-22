@@ -50,7 +50,7 @@ def rule_rows(project: Project) -> list[dict]:
         if g is None:
             continue
         release = cr.release if cr.release is not None else g.on_release
-        rows.append({"source": "frame_group_control", "keys": sorted(cr.keys, key="WASD123456".index),
+        rows.append({"source": "frame_group_control", "keys": sorted(cr.keys, key="WASD1234567890".index),
                      "only_if_in": list(cr.only_in) or None, "plays": cr.group, "mode": "play_once" if cr.once else "loop", "when_released": release})
     keyed = [g for g in project.groups if g.key]
     keyed.sort(key=lambda g: 0 if g.key in DIAGONALS else 1)                       # a diagonal beats a single key

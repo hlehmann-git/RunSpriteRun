@@ -409,7 +409,7 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event) -> None:
         if self.confirm_close():
             if self.control_window is not None:
-                self.control_window._apply()          # the Frame Group Control window has no X: it goes with the main window
+                self.control_window.reject()
             event.accept()
         else:
             event.ignore()
@@ -423,14 +423,13 @@ class MainWindow(QMainWindow):
             ExportDialog(self, self.controller.project).exec()
 
     def show_control_window(self) -> None:
-        """Set Rules / Group > Frame Group Control: the window that says which keys play which frame group. It stays open
-        beside the main window."""
-        if self.controller.project is None or self._editing():
+        """Set Rules / Group > Frame Group Control: the pop-up that says which keys play which frame group."""
+        if self.controller.project is None or self._editing() or self.controller.add_mode:
             return
         if self.control_window is None:
             from src.app.control_window import ControlWindow
             self.control_window = ControlWindow(self, self.controller)
-        self.control_window.rebuild()
+        self.control_window.load()
         self.control_window.show()
         self.control_window.raise_()
         self.control_window.activateWindow()

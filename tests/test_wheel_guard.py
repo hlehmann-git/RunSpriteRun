@@ -61,3 +61,17 @@ def test_rules_window_combos_ignore_the_wheel():
         c.clearFocus()
         _wheel(c)
     assert [c.currentIndex() for c in combos] == before
+
+
+def test_a_focused_combo_still_ignores_the_wheel():
+    host, c, s = _box()
+    host.activateWindow()
+    c.setFocus()
+    app.processEvents()
+    c.setCurrentIndex(1)
+    _wheel(c)
+    assert c.currentIndex() == 1                       # clicked into, still unchanged
+    from PySide6.QtCore import QEvent
+    ev = QWheelEvent(QPointF(5, 5), QPointF(5, 5), QPoint(0, 0), QPoint(0, 120), Qt.NoButton, Qt.NoModifier, Qt.NoScrollPhase, False)
+    app.sendEvent(c, ev)
+    assert c.currentIndex() == 1

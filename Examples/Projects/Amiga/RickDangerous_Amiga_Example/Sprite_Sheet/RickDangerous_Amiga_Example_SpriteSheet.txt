@@ -1,0 +1,31 @@
+Project: RickDangerous_Amiga_Example
+System: Amiga
+FramesPerSecond: 6
+FrameSize: 24 x 21
+SheetFile: RickDangerous_Amiga_Example_SpriteSheet.png
+SheetSize: 640 x 141
+Number, Label, Group, X, Y, Width, Height
+1, Rick_001, walkright, 1, 63, 24, 21
+2, Rick_002, walkright, 26, 63, 24, 21
+3, Rick_003, walkright, 51, 63, 24, 21
+4, Rick_004, walkright, 76, 63, 24, 21
+5, Rick_005, walkright, 101, 63, 24, 21
+6, Rick_006, CrouchRight, 126, 63, 24, 21
+7, Rick_007, CrouchRight, 151, 63, 24, 21
+8, Rick_008, JumpRight, 176, 63, 24, 21
+9, Rick_009, ShootRight, 201, 63, 24, 21
+10, Rick_010, ProdRight, 226, 63, 24, 21
+11, Rick_011, Climb, 1, 85, 24, 21
+12, Rick_012, Climb, 26, 85, 24, 21
+13, Rick_013, walkLeft, 51, 85, 24, 21
+14, Rick_014, walkLeft, 76, 85, 24, 21
+15, Rick_015, walkLeft, 101, 85, 24, 21
+16, Rick_016, walkLeft, 126, 85, 24, 21
+17, Rick_017, walkLeft, 151, 85, 24, 21
+18, Rick_018, CrouchLeft, 176, 85, 24, 21
+19, Rick_019, CrouchLeft, 201, 85, 24, 21
+20, Rick_020, JumpLeft, 226, 85, 24, 21
+21, Rick_021, ShootLeft, 1, 107, 24, 21
+22, Rick_022, ProdLeft, 26, 107, 24, 21
+23, Rick_023, Die, 51, 107, 24, 21
+24, Rick_024, Die, 76, 107, 24, 21

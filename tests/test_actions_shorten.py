@@ -108,3 +108,35 @@ def test_edit_menu_has_shorten_frame_names_and_it_works():
     w.act_shorten.trigger()
     assert [f.label for f in w.controller.project.frames] == ["Rick_001", "Rick_002", "Rick_003"]
     assert not w.controller.can_undo                                            # it cannot be undone
+
+
+def test_a_project_with_an_action_rule_saves_exports_and_opens_again(tmp_path):
+    from src.core.project import ControlRule, Rule
+    from src.io.project_file import open_project, save_project
+    from src.io.rules_export import rule_rows
+    from tests.test_control_window import make
+    p = make(rules=[ControlRule(["W", "D"], "TurnLeft"), ControlRule(["7"], "Shoot", True, Rule("frame", "f9"))])
+    assert [r["keys"] for r in rule_rows(p)][:2] == [["W", "D"], ["7"]]
+    save_project(p, tmp_path / "x.rsr")
+    back = open_project(tmp_path / "x.rsr")
+    assert [r.keys for r in back.control_rules] == [["W", "D"], ["7"]]
+    assert back.control_rules[1].once and back.control_rules[1].release.kind == "frame" and back.control_rules[1].release.target.startswith("f9")
+
+
+def test_an_older_or_damaged_file_cannot_combine_an_action_key_with_others(tmp_path):
+    import json, zipfile
+    from src.core.project import ControlRule
+    from src.io.project_file import open_project, save_project
+    from tests.test_control_window import make
+    p = make(rules=[ControlRule(["7"], "Shoot", True)])
+    save_project(p, tmp_path / "x.rsr")
+    out = tmp_path / "y.rsr"
+    with zipfile.ZipFile(tmp_path / "x.rsr") as zin, zipfile.ZipFile(out, "w") as zout:
+        for item in zin.infolist():
+            data = zin.read(item.filename)
+            if item.filename.endswith(".json") and b"control_rules" in data:
+                d = json.loads(data)
+                d["control_rules"][0]["keys"] = ["7", "W"]
+                data = json.dumps(d).encode()
+            zout.writestr(item, data)
+    assert open_project(out).control_rules == []                  # the damaged rule is dropped, never the project

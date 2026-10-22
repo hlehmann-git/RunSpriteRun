@@ -13,7 +13,7 @@ from PIL import Image
 
 from src.core.layers import colours_of, flatten
 from src.core.project import ControlRule, Frame, Group, Project, Rule, Transition
-from src.core.rules import has_opposites
+from src.core.rules import ACTION_KEYS, has_opposites
 from src.core.rules import FPS_CHOICES, MAX_FRAMES, MAX_SIZE, MIN_SIZE, valid_label, valid_project_name
 from src.core.systems import get_system
 
@@ -197,7 +197,8 @@ def open_project(path: str | Path) -> Project:
             for d in meta.get("control_rules", []):                    # a damaged or out-of-date rule is dropped, never the project
                 try:
                     keys = [k for k in d["keys"]]
-                    if (keys and all(isinstance(k, str) and k in ("W", "A", "S", "D", "1", "2", "3", "4", "5", "6") for k in keys)
+                    if (keys and all(isinstance(k, str) and k in ("W", "A", "S", "D", "1", "2", "3", "4", "5", "6") + ACTION_KEYS for k in keys)
+                            and not (len(keys) > 1 and any(k in ACTION_KEYS for k in keys))      # an action key stands alone
                             and len(set(keys)) == len(keys) and not has_opposites(keys) and d["group"] in names):
                         only_in = [str(x) for x in d.get("only_in", [])]
                         if d.get("from_group"):                       # a v2.0.10 or v2.0.11 file: one group

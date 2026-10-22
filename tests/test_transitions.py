@@ -343,29 +343,43 @@ def win(app, monkeypatch):
     return w
 
 
+def _tr_widgets(cw, i):
+    row = cw._rows[("transition", i)][0]
+    from PySide6.QtWidgets import QCheckBox, QComboBox, QPushButton
+    return (row.findChildren(QPushButton)[0], row.findChildren(QComboBox), row.findChild(QCheckBox))
+
+
 def test_the_window_lists_transitions_and_edits_them(win):
     cw = win.control_window
-    assert 0 in cw._tr and cw._tr[0]["from"].text().startswith("WalkRight")
-    cw._tr[0]["interruptible"].setChecked(True)
+    frm, combos, irq = _tr_widgets(cw, 0)
+    assert frm.text().startswith("WalkRight")
+    irq.setChecked(True)
+    assert cw.d_trans[0].interruptible is True
+    assert win.controller.project.transitions[0].interruptible is False       # nothing is saved until Apply
+    cw.apply_btn.click()
     assert win.controller.project.transitions[0].interruptible is True
     win.controller.undo()
     assert win.controller.project.transitions[0].interruptible is False
-    cw.rebuild()
-    cw._tr[0]["to"].setCurrentIndex(cw._tr[0]["to"].findData("ClimbUp"))
+    win.show_control_window()
+    cw._edit_transition(0, to="ClimbUp")
+    cw.apply_btn.click()
     assert win.controller.project.transitions[0].to == "ClimbUp"
 
 
 def test_add_and_delete_a_transition(win):
     cw = win.control_window
     cw._add_transition()
-    assert len(win.controller.project.transitions) == 2 and win.controller.project.transitions[1].from_groups == []
+    assert len(cw.d_trans) == 2 and cw.d_trans[1].from_groups == []
     cw._delete_transition(0)
-    assert len(win.controller.project.transitions) == 1
+    assert len(cw.d_trans) == 1
+    assert len(win.controller.project.transitions) == 1                       # the project only changes on Apply
 
 
-def test_a_bad_transition_change_is_refused(win, monkeypatch):
+def test_a_bad_transition_change_is_marked_and_cannot_be_applied(win):
     cw = win.control_window
-    cw._edit_transition(0, play="WalkLeft")              # the same group as the one it goes to
+    cw._edit_transition(0, play="WalkLeft", rebuild=False)                    # the same group as the one it goes to
+    assert cw._rows[("transition", 0)][1].text() and not cw.apply_btn.isEnabled()
+    cw.apply_btn.click()
     assert win.controller.project.transitions[0].play == "TurnLeft"
 
 
@@ -381,11 +395,13 @@ def test_the_keys_dialog_disables_the_opposite_key(app):
 def test_release_choice_has_play_once(app):
     p = make()
     rc = control_window.ReleaseChoice(p, Rule("group", "Settle", False, True), "none", lambda: None)
-    assert rc.mode.currentText() == "Go to Group (play once)" and rc.rule() == Rule("group", "Settle", False, True)
-    rc.mode.setCurrentIndex(2)
+    assert rc.currentText() == "Group Settle (once)" and rc.rule() == Rule("group", "Settle", False, True)
+    rc.setCurrentIndex(rc.findData(rc.key_of(Rule("group", "Settle", True, False))))
     assert rc.rule() == Rule("group", "Settle", True, False)
-    rc.mode.setCurrentIndex(4)
+    rc.setCurrentIndex(rc.findData(rc.key_of(Rule("group", "Settle", False, False))))
     assert rc.rule() == Rule("group", "Settle", False, False)
+    rc.setCurrentIndex(0)
+    assert rc.rule() is None
 
 
 def test_the_panels_release_editor_keeps_play_once(app):

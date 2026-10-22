@@ -1,0 +1,12 @@
+Project: RickDangerous_Amiga_Example
+System: Amiga
+FramesPerSecond: 6
+FrameSize: 24 x 21
+SheetFile: RickDangerous_Amiga_Example_walkLeft_SpriteSheet.png
+SheetSize: 640 x 97
+Number, Label, Group, X, Y, Width, Height
+13, Rick_013, walkLeft, 1, 63, 24, 21
+14, Rick_014, walkLeft, 26, 63, 24, 21
+15, Rick_015, walkLeft, 51, 63, 24, 21
+16, Rick_016, walkLeft, 76, 63, 24, 21
+17, Rick_017, walkLeft, 101, 63, 24, 21

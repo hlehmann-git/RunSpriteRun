@@ -1,0 +1,623 @@
+{
+  "about": "RunSpriteRun frame group rules: which keys play which frame group. Written by RunSpriteRun; not read back.",
+  "how_to_read": [
+    "Rules are checked from priority 1 downwards while the player holds keys; the first rule whose keys are all held plays its group.",
+    "only_if_in: when a list of group names is given, the rule only fires while the frame on screen belongs to one of those groups (for example fire plays FireLeft only while the character is in a left-facing group). null means always.",
+    "Rules from frame_group_control come first. After them come the keys given to a group in Set Frame Group (source group_key): a diagonal such as W+D beats a single key, otherwise the key pressed last wins.",
+    "mode loop: the group repeats while the keys are held. mode play_once: it plays through one time, will not fire again until the keys are let go, and then the next matching rule takes over.",
+    "when_released says what happens when no playable key is held (or a play_once rule ends with nothing held): go to a frame (shown still), or go to a group (looping or still on its first frame). null means stay on the group's last frame.",
+    "transitions: when the controls are about to play the group in to while the frame on screen is in one of the groups in from (or any group), the group in play_first plays once first, then the group in to starts. A row naming the group beats an any row. interruptible true means a change of keys stops it at once.",
+    "Opposite directions (W and S, A and D) never count together, as on a joystick: the one pressed first counts until it is let go.",
+    "Frame numbers are 1-based, as in RunSpriteRun. W A S D are up, left, down, right; 1 to 6 are fire buttons."
+  ],
+  "project": {
+    "name": "RickDangerous_Amiga_Example",
+    "system": "Amiga",
+    "frame_width": 24,
+    "frame_height": 21,
+    "frames_per_second": 6,
+    "frame_count": 24,
+    "all_frames_sprite_sheet": "RickDangerous_Amiga_Example_SpriteSheet.png"
+  },
+  "controller": {
+    "directions": [
+      "W",
+      "A",
+      "S",
+      "D"
+    ],
+    "diagonals": [
+      "W+A",
+      "W+D",
+      "S+D",
+      "S+A"
+    ],
+    "buttons": [
+      "1"
+    ]
+  },
+  "start_state": null,
+  "groups": [
+    {
+      "name": "walkright",
+      "first_frame": 1,
+      "last_frame": 5,
+      "frame_count": 5,
+      "first_label": "Rick_001",
+      "last_label": "Rick_005",
+      "colour": [
+        255,
+        85,
+        0
+      ],
+      "key": null,
+      "sprite_sheet": "RickDangerous_Amiga_Example_walkright_SpriteSheet.png",
+      "frames": [
+        {
+          "number": 1,
+          "label": "Rick_001",
+          "file": "RickDangerous_Amiga_Example_walkright_Rick_001.png"
+        },
+        {
+          "number": 2,
+          "label": "Rick_002",
+          "file": "RickDangerous_Amiga_Example_walkright_Rick_002.png"
+        },
+        {
+          "number": 3,
+          "label": "Rick_003",
+          "file": "RickDangerous_Amiga_Example_walkright_Rick_003.png"
+        },
+        {
+          "number": 4,
+          "label": "Rick_004",
+          "file": "RickDangerous_Amiga_Example_walkright_Rick_004.png"
+        },
+        {
+          "number": 5,
+          "label": "Rick_005",
+          "file": "RickDangerous_Amiga_Example_walkright_Rick_005.png"
+        }
+      ]
+    },
+    {
+      "name": "CrouchRight",
+      "first_frame": 6,
+      "last_frame": 7,
+      "frame_count": 2,
+      "first_label": "Rick_006",
+      "last_label": "Rick_007",
+      "colour": [
+        85,
+        170,
+        0
+      ],
+      "key": null,
+      "sprite_sheet": "RickDangerous_Amiga_Example_CrouchRight_SpriteSheet.png",
+      "frames": [
+        {
+          "number": 6,
+          "label": "Rick_006",
+          "file": "RickDangerous_Amiga_Example_CrouchRight_Rick_006.png"
+        },
+        {
+          "number": 7,
+          "label": "Rick_007",
+          "file": "RickDangerous_Amiga_Example_CrouchRight_Rick_007.png"
+        }
+      ]
+    },
+    {
+      "name": "JumpRight",
+      "first_frame": 8,
+      "last_frame": 8,
+      "frame_count": 1,
+      "first_label": "Rick_008",
+      "last_label": "Rick_008",
+      "colour": [
+        255,
+        255,
+        127
+      ],
+      "key": null,
+      "sprite_sheet": "RickDangerous_Amiga_Example_JumpRight_SpriteSheet.png",
+      "frames": [
+        {
+          "number": 8,
+          "label": "Rick_008",
+          "file": "RickDangerous_Amiga_Example_JumpRight_Rick_008.png"
+        }
+      ]
+    },
+    {
+      "name": "ShootRight",
+      "first_frame": 9,
+      "last_frame": 9,
+      "frame_count": 1,
+      "first_label": "Rick_009",
+      "last_label": "Rick_009",
+      "colour": [
+        255,
+        170,
+        0
+      ],
+      "key": null,
+      "sprite_sheet": "RickDangerous_Amiga_Example_ShootRight_SpriteSheet.png",
+      "frames": [
+        {
+          "number": 9,
+          "label": "Rick_009",
+          "file": "RickDangerous_Amiga_Example_ShootRight_Rick_009.png"
+        }
+      ]
+    },
+    {
+      "name": "ProdRight",
+      "first_frame": 10,
+      "last_frame": 10,
+      "frame_count": 1,
+      "first_label": "Rick_010",
+      "last_label": "Rick_010",
+      "colour": [
+        0,
+        255,
+        255
+      ],
+      "key": null,
+      "sprite_sheet": "RickDangerous_Amiga_Example_ProdRight_SpriteSheet.png",
+      "frames": [
+        {
+          "number": 10,
+          "label": "Rick_010",
+          "file": "RickDangerous_Amiga_Example_ProdRight_Rick_010.png"
+        }
+      ]
+    },
+    {
+      "name": "Climb",
+      "first_frame": 11,
+      "last_frame": 12,
+      "frame_count": 2,
+      "first_label": "Rick_011",
+      "last_label": "Rick_012",
+      "colour": [
+        170,
+        0,
+        255
+      ],
+      "key": null,
+      "sprite_sheet": "RickDangerous_Amiga_Example_Climb_SpriteSheet.png",
+      "frames": [
+        {
+          "number": 11,
+          "label": "Rick_011",
+          "file": "RickDangerous_Amiga_Example_Climb_Rick_011.png"
+        },
+        {
+          "number": 12,
+          "label": "Rick_012",
+          "file": "RickDangerous_Amiga_Example_Climb_Rick_012.png"
+        }
+      ]
+    },
+    {
+      "name": "walkLeft",
+      "first_frame": 13,
+      "last_frame": 17,
+      "frame_count": 5,
+      "first_label": "Rick_013",
+      "last_label": "Rick_017",
+      "colour": [
+        255,
+        170,
+        255
+      ],
+      "key": null,
+      "sprite_sheet": "RickDangerous_Amiga_Example_walkLeft_SpriteSheet.png",
+      "frames": [
+        {
+          "number": 13,
+          "label": "Rick_013",
+          "file": "RickDangerous_Amiga_Example_walkLeft_Rick_013.png"
+        },
+        {
+          "number": 14,
+          "label": "Rick_014",
+          "file": "RickDangerous_Amiga_Example_walkLeft_Rick_014.png"
+        },
+        {
+          "number": 15,
+          "label": "Rick_015",
+          "file": "RickDangerous_Amiga_Example_walkLeft_Rick_015.png"
+        },
+        {
+          "number": 16,
+          "label": "Rick_016",
+          "file": "RickDangerous_Amiga_Example_walkLeft_Rick_016.png"
+        },
+        {
+          "number": 17,
+          "label": "Rick_017",
+          "file": "RickDangerous_Amiga_Example_walkLeft_Rick_017.png"
+        }
+      ]
+    },
+    {
+      "name": "CrouchLeft",
+      "first_frame": 18,
+      "last_frame": 19,
+      "frame_count": 2,
+      "first_label": "Rick_018",
+      "last_label": "Rick_019",
+      "colour": [
+        170,
+        255,
+        255
+      ],
+      "key": null,
+      "sprite_sheet": "RickDangerous_Amiga_Example_CrouchLeft_SpriteSheet.png",
+      "frames": [
+        {
+          "number": 18,
+          "label": "Rick_018",
+          "file": "RickDangerous_Amiga_Example_CrouchLeft_Rick_018.png"
+        },
+        {
+          "number": 19,
+          "label": "Rick_019",
+          "file": "RickDangerous_Amiga_Example_CrouchLeft_Rick_019.png"
+        }
+      ]
+    },
+    {
+      "name": "JumpLeft",
+      "first_frame": 20,
+      "last_frame": 20,
+      "frame_count": 1,
+      "first_label": "Rick_020",
+      "last_label": "Rick_020",
+      "colour": [
+        170,
+        85,
+        127
+      ],
+      "key": null,
+      "sprite_sheet": "RickDangerous_Amiga_Example_JumpLeft_SpriteSheet.png",
+      "frames": [
+        {
+          "number": 20,
+          "label": "Rick_020",
+          "file": "RickDangerous_Amiga_Example_JumpLeft_Rick_020.png"
+        }
+      ]
+    },
+    {
+      "name": "ShootLeft",
+      "first_frame": 21,
+      "last_frame": 21,
+      "frame_count": 1,
+      "first_label": "Rick_021",
+      "last_label": "Rick_021",
+      "colour": [
+        255,
+        85,
+        0
+      ],
+      "key": null,
+      "sprite_sheet": "RickDangerous_Amiga_Example_ShootLeft_SpriteSheet.png",
+      "frames": [
+        {
+          "number": 21,
+          "label": "Rick_021",
+          "file": "RickDangerous_Amiga_Example_ShootLeft_Rick_021.png"
+        }
+      ]
+    },
+    {
+      "name": "ProdLeft",
+      "first_frame": 22,
+      "last_frame": 22,
+      "frame_count": 1,
+      "first_label": "Rick_022",
+      "last_label": "Rick_022",
+      "colour": [
+        170,
+        0,
+        127
+      ],
+      "key": null,
+      "sprite_sheet": "RickDangerous_Amiga_Example_ProdLeft_SpriteSheet.png",
+      "frames": [
+        {
+          "number": 22,
+          "label": "Rick_022",
+          "file": "RickDangerous_Amiga_Example_ProdLeft_Rick_022.png"
+        }
+      ]
+    },
+    {
+      "name": "Die",
+      "first_frame": 23,
+      "last_frame": 24,
+      "frame_count": 2,
+      "first_label": "Rick_023",
+      "last_label": "Rick_024",
+      "colour": [
+        255,
+        0,
+        0
+      ],
+      "key": null,
+      "sprite_sheet": "RickDangerous_Amiga_Example_Die_SpriteSheet.png",
+      "frames": [
+        {
+          "number": 23,
+          "label": "Rick_023",
+          "file": "RickDangerous_Amiga_Example_Die_Rick_023.png"
+        },
+        {
+          "number": 24,
+          "label": "Rick_024",
+          "file": "RickDangerous_Amiga_Example_Die_Rick_024.png"
+        }
+      ]
+    }
+  ],
+  "transitions": [],
+  "rules": [
+    {
+      "priority": 1,
+      "source": "frame_group_control",
+      "keys": [
+        "W",
+        "1"
+      ],
+      "only_if_in": [
+        "walkright",
+        "CrouchRight",
+        "JumpRight",
+        "ShootRight",
+        "ProdRight"
+      ],
+      "plays": "ShootRight",
+      "mode": "loop",
+      "when_released": {
+        "go_to": "frame",
+        "target": "Rick_001"
+      }
+    },
+    {
+      "priority": 2,
+      "source": "frame_group_control",
+      "keys": [
+        "W",
+        "1"
+      ],
+      "only_if_in": [
+        "walkLeft",
+        "CrouchLeft",
+        "JumpLeft",
+        "ShootLeft",
+        "ProdLeft"
+      ],
+      "plays": "ShootLeft",
+      "mode": "loop",
+      "when_released": {
+        "go_to": "frame",
+        "target": "Rick_013"
+      }
+    },
+    {
+      "priority": 3,
+      "source": "frame_group_control",
+      "keys": [
+        "A",
+        "1"
+      ],
+      "only_if_in": null,
+      "plays": "ProdLeft",
+      "mode": "loop",
+      "when_released": {
+        "go_to": "frame",
+        "target": "Rick_013"
+      }
+    },
+    {
+      "priority": 4,
+      "source": "frame_group_control",
+      "keys": [
+        "D",
+        "1"
+      ],
+      "only_if_in": null,
+      "plays": "ProdRight",
+      "mode": "loop",
+      "when_released": {
+        "go_to": "frame",
+        "target": "Rick_001"
+      }
+    },
+    {
+      "priority": 5,
+      "source": "frame_group_control",
+      "keys": [
+        "W",
+        "D"
+      ],
+      "only_if_in": null,
+      "plays": "JumpRight",
+      "mode": "loop",
+      "when_released": {
+        "go_to": "frame",
+        "target": "Rick_001"
+      }
+    },
+    {
+      "priority": 6,
+      "source": "frame_group_control",
+      "keys": [
+        "W",
+        "A"
+      ],
+      "only_if_in": null,
+      "plays": "JumpLeft",
+      "mode": "loop",
+      "when_released": {
+        "go_to": "frame",
+        "target": "Rick_013"
+      }
+    },
+    {
+      "priority": 7,
+      "source": "frame_group_control",
+      "keys": [
+        "S",
+        "D"
+      ],
+      "only_if_in": null,
+      "plays": "CrouchRight",
+      "mode": "loop",
+      "when_released": {
+        "go_to": "frame",
+        "target": "Rick_001"
+      }
+    },
+    {
+      "priority": 8,
+      "source": "frame_group_control",
+      "keys": [
+        "A",
+        "S"
+      ],
+      "only_if_in": null,
+      "plays": "CrouchLeft",
+      "mode": "loop",
+      "when_released": {
+        "go_to": "frame",
+        "target": "Rick_013"
+      }
+    },
+    {
+      "priority": 9,
+      "source": "frame_group_control",
+      "keys": [
+        "W"
+      ],
+      "only_if_in": [
+        "walkright",
+        "CrouchRight",
+        "JumpRight",
+        "ShootRight",
+        "ProdRight"
+      ],
+      "plays": "JumpRight",
+      "mode": "loop",
+      "when_released": {
+        "go_to": "frame",
+        "target": "Rick_001"
+      }
+    },
+    {
+      "priority": 10,
+      "source": "frame_group_control",
+      "keys": [
+        "W"
+      ],
+      "only_if_in": [
+        "walkLeft",
+        "CrouchLeft",
+        "JumpLeft",
+        "ShootLeft",
+        "ProdLeft"
+      ],
+      "plays": "JumpLeft",
+      "mode": "loop",
+      "when_released": {
+        "go_to": "frame",
+        "target": "Rick_013"
+      }
+    },
+    {
+      "priority": 11,
+      "source": "frame_group_control",
+      "keys": [
+        "S"
+      ],
+      "only_if_in": [
+        "walkright",
+        "CrouchRight",
+        "JumpRight",
+        "ShootRight",
+        "ProdRight"
+      ],
+      "plays": "CrouchRight",
+      "mode": "loop",
+      "when_released": {
+        "go_to": "frame",
+        "target": "Rick_001"
+      }
+    },
+    {
+      "priority": 12,
+      "source": "frame_group_control",
+      "keys": [
+        "S"
+      ],
+      "only_if_in": [
+        "walkLeft",
+        "CrouchLeft",
+        "JumpLeft",
+        "ShootLeft",
+        "ProdLeft"
+      ],
+      "plays": "CrouchLeft",
+      "mode": "loop",
+      "when_released": {
+        "go_to": "frame",
+        "target": "Rick_013"
+      }
+    },
+    {
+      "priority": 13,
+      "source": "frame_group_control",
+      "keys": [
+        "D"
+      ],
+      "only_if_in": null,
+      "plays": "walkright",
+      "mode": "loop",
+      "when_released": {
+        "go_to": "frame",
+        "target": "Rick_001"
+      }
+    },
+    {
+      "priority": 14,
+      "source": "frame_group_control",
+      "keys": [
+        "A"
+      ],
+      "only_if_in": null,
+      "plays": "walkLeft",
+      "mode": "loop",
+      "when_released": {
+        "go_to": "frame",
+        "target": "Rick_013"
+      }
+    },
+    {
+      "priority": 15,
+      "source": "frame_group_control",
+      "keys": [
+        "7"
+      ],
+      "only_if_in": null,
+      "plays": "Die",
+      "mode": "play_once",
+      "when_released": {
+        "go_to": "frame",
+        "target": "Rick_024"
+      }
+    }
+  ]
+}

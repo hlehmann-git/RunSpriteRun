@@ -1,0 +1,8 @@
+Project: RickDangerous_Amiga_Example
+System: Amiga
+FramesPerSecond: 6
+FrameSize: 24 x 21
+SheetFile: RickDangerous_Amiga_Example_ShootLeft_SpriteSheet.png
+SheetSize: 640 x 97
+Number, Label, Group, X, Y, Width, Height
+21, Rick_021, ShootLeft, 1, 63, 24, 21

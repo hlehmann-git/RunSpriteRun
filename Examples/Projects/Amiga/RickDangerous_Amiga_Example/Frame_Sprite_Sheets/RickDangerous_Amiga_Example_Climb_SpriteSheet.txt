@@ -1,0 +1,9 @@
+Project: RickDangerous_Amiga_Example
+System: Amiga
+FramesPerSecond: 6
+FrameSize: 24 x 21
+SheetFile: RickDangerous_Amiga_Example_Climb_SpriteSheet.png
+SheetSize: 640 x 97
+Number, Label, Group, X, Y, Width, Height
+11, Rick_011, Climb, 1, 63, 24, 21
+12, Rick_012, Climb, 26, 63, 24, 21

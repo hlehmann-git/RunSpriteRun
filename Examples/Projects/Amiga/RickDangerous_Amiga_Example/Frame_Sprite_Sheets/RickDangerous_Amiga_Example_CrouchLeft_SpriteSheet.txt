@@ -1,0 +1,9 @@
+Project: RickDangerous_Amiga_Example
+System: Amiga
+FramesPerSecond: 6
+FrameSize: 24 x 21
+SheetFile: RickDangerous_Amiga_Example_CrouchLeft_SpriteSheet.png
+SheetSize: 640 x 97
+Number, Label, Group, X, Y, Width, Height
+18, Rick_018, CrouchLeft, 1, 63, 24, 21
+19, Rick_019, CrouchLeft, 26, 63, 24, 21

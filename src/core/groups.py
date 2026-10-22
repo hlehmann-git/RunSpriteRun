@@ -218,3 +218,84 @@ def set_group_release(project: Project, name: str, rule: Rule | None) -> None:
 
 def control_rules_for(project: Project, name: str) -> list[ControlRule]:
     return [cr for cr in project.control_rules if cr.group == name]
+
+
+# ---- action groups and the checks the Frame Group Control window makes before Apply (v2.0.14) ------------------------
+MSG_ACTION_USED_ELSEWHERE = "{g} is played by an action key, so it cannot also be used by the other rules or transitions."
+MSG_ACTION_RELEASE_OUTSIDE = "An action key can only release to a frame inside its own group."
+MSG_RELEASE_IN_ACTION = "This release goes to {g}, which belongs to an action key."
+MSG_CHORD_HIDDEN = "Rule {n} can never play: rule {m} above it already matches whenever these keys are held. Move it above rule {m}."
+
+
+def action_groups(rules: list[ControlRule]) -> set[str]:
+    """The groups played by an action key (7 8 9 0). They are used by nothing else."""
+    return {r.group for r in rules if any(k in ACTION_KEYS for k in r.keys)}
+
+
+def group_frame_labels(project: Project, name: str) -> list[str]:
+    g = find_group(project, name)
+    if g is None:
+        return []
+    return [f.label for f in project.frames[g.first:g.last + 1]]
+
+
+def _release_problem(project: Project, rule: Rule | None, action: set[str]) -> str | None:
+    """A normal release may not go to an action group or to a frame inside one."""
+    if rule is None:
+        return None
+    if rule.kind == "group" and rule.target in action:
+        return MSG_RELEASE_IN_ACTION.format(g=rule.target)
+    if rule.kind == "frame":
+        for name in action:
+            if rule.target in group_frame_labels(project, name):
+                return MSG_RELEASE_IN_ACTION.format(g=name)
+    return None
+
+
+def rule_problems(project: Project, rules: list[ControlRule], transitions: list[Transition]) -> dict[tuple[str, int], str]:
+    """Every reason the rules and transitions cannot be applied yet, keyed ("rule", row) or ("transition", row), rows 0-based.
+    An empty result means they can be applied."""
+    out: dict[tuple[str, int], str] = {}
+    action = action_groups(rules)
+    for i, r in enumerate(rules):
+        try:
+            check_control_rule(project, r)
+        except GroupError as e:
+            out[("rule", i)] = str(e)
+            continue
+        is_action = any(k in ACTION_KEYS for k in r.keys)
+        if is_action:
+            rel = r.release
+            if rel is not None and not (rel.kind == "frame" and rel.target in group_frame_labels(project, r.group)):
+                out[("rule", i)] = MSG_ACTION_RELEASE_OUTSIDE
+            elif any(not any(k in ACTION_KEYS for k in o.keys) and o.group == r.group for o in rules):
+                out[("rule", i)] = MSG_ACTION_USED_ELSEWHERE.format(g=r.group)
+            continue
+        if r.group in action:
+            out[("rule", i)] = MSG_ACTION_USED_ELSEWHERE.format(g=r.group)
+            continue
+        if any(x in action for x in r.only_in):
+            out[("rule", i)] = MSG_ACTION_USED_ELSEWHERE.format(g=next(x for x in r.only_in if x in action))
+            continue
+        bad = _release_problem(project, r.release, action)
+        if bad:
+            out[("rule", i)] = bad
+            continue
+        keys = set(r.keys)
+        for j in range(i):
+            o = rules[j]
+            if any(k in ACTION_KEYS for k in o.keys) or not set(o.keys) <= keys:
+                continue
+            if not o.only_in or (r.only_in and set(r.only_in) <= set(o.only_in)):
+                out[("rule", i)] = MSG_CHORD_HIDDEN.format(n=i + 1, m=j + 1)
+                break
+    for i, t in enumerate(transitions):
+        try:
+            check_transition(project, t)
+        except GroupError as e:
+            out[("transition", i)] = str(e)
+            continue
+        used = [x for x in (t.to, t.play, *t.from_groups) if x in action]
+        if used:
+            out[("transition", i)] = MSG_ACTION_USED_ELSEWHERE.format(g=used[0])
+    return out
