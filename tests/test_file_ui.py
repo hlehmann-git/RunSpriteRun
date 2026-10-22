@@ -219,7 +219,7 @@ def test_information_rows_follow_prd(win):
 def test_help_and_about_text(win):
     assert len(HelpDialog(win).text.toPlainText().splitlines()) == 10
     a = AboutDialog(win)
-    assert a.author.text() == "by Harley Lehmann" and a.version.text() == "Version 2.0.11"
+    assert a.author.text() == "by Harley Lehmann" and a.version.text() == "Version 2.0.13"
     assert "5649" in a.comments.text() and not a.picture.pixmap().isNull()
     assert a.picture.pixmap().width() == 480
     assert "Deluxe Paint" in a.description.text() and "Buddy Claude" in a.small_print.text()

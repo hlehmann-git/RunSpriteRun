@@ -18,6 +18,7 @@ class Rule:
     kind: Literal["frame", "group"]
     target: str            # frame label, or group name
     loop: bool = False     # only meaningful for kind == "group"
+    once: bool = False     # only meaningful for kind == "group": play the group through one time, then rest on its own On Release
 
 
 @dataclass
@@ -38,7 +39,18 @@ class ControlRule:
     group: str                         # the group that plays
     once: bool = False                 # True: play through one time, then hand over; False: loop while the keys are held
     release: Rule | None = None        # when all keys are let go (or a play-once ends with nothing held): None = the group's On Release
-    from_group: str = ""               # "" = always; otherwise the rule only fires while the frame on screen belongs to this group
+    only_in: list[str] = field(default_factory=list)   # [] = always; otherwise the rule only fires while the frame on screen belongs to one of
+                                                       # these groups (for example every group in which the character faces left)
+
+
+@dataclass
+class Transition:
+    """When the controls are about to play group `to` while the frame on screen is in one of `from_groups` ([] = any group), play
+    group `play` once first. The transition group has no key of its own; it plays only because a row names it."""
+    from_groups: list[str]
+    to: str
+    play: str
+    interruptible: bool = False        # True: a change of keys while it plays stops it at once; False: it plays through first
 
 
 _uids = itertools.count(1)
@@ -65,6 +77,7 @@ class Project:
     groups: list[Group] = field(default_factory=list)
     start_state: Rule | None = None
     control_rules: list[ControlRule] = field(default_factory=list)   # Frame Group Control rules, top rule first
+    transitions: list[Transition] = field(default_factory=list)       # Frame Group Control transitions
     file_path: str | None = None
     source_sheet: str | None = None   # sprite sheet this project was imported from; copied into the project folder on first Save
     written_files: list[str] = field(default_factory=list)   # files Save wrote last time (relative paths), for cleaning up

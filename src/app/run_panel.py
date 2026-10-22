@@ -1,5 +1,5 @@
 """RunSpriteRun window (FR-3.3): shows what RunSpriteRun is doing, with the Scale toggle and Zoom buttons.
-F5 and the keys are handled by the main window and the controller; this panel only displays."""
+The keys and Esc are handled by the main window and the controller; this panel only displays."""
 from __future__ import annotations
 
 from PySide6.QtCore import QRectF, Qt, Signal
@@ -36,7 +36,6 @@ class ToggleSwitch(QAbstractButton):
 
 
 class RunPanel(Panel):
-    toggle_requested = Signal()                      # the F5 Toggle button was clicked
 
     def __init__(self, parent: QWidget, controller: Controller) -> None:
         super().__init__("RunSpriteRun window", parent)
@@ -61,25 +60,14 @@ class RunPanel(Panel):
             b.setGeometry(x, y, 22, 22)
             b.setStyleSheet(TOGGLE_BUTTON_STYLE + "QPushButton { padding: 0; font-size: 14px; }")
             x += 22 + 4
-        self.f5_btn = QPushButton("F5 Toggle", self)         # does what pressing F5 does
-        self.f5_btn.setCheckable(True)
-        self.f5_btn.setFocusPolicy(Qt.NoFocus)
-        self.f5_btn.setGeometry(x + 2, y, 66, 22)
-        self.f5_btn.setStyleSheet(TOGGLE_BUTTON_STYLE)
         self.minus.setAccessibleName("Zoom out")
         self.plus.setAccessibleName("Zoom in")
 
         self.switch.clicked.connect(self._toggle_scale)
         self.minus.clicked.connect(lambda: self._set_zoom(self.zoom - 1))
         self.plus.clicked.connect(lambda: self._set_zoom(self.zoom + 1))
-        self.f5_btn.clicked.connect(self._f5_clicked)
-        controller.run_state.connect(self.f5_btn.setChecked)
         controller.project_changed.connect(self._project_changed)
         controller.run_frame.connect(self._show)
-
-    def _f5_clicked(self) -> None:
-        self.toggle_requested.emit()
-        self.f5_btn.setChecked(self.controller.running)    # always mirrors whether it is running
 
     # ---- zoom -----------------------------------------------------------------------------------
     def _project_changed(self) -> None:

@@ -51,19 +51,19 @@ def test_chord_rule_wins_over_the_basic_key_and_returns_when_the_extra_key_is_le
 
 
 def test_play_once_rule_plays_through_then_the_newest_key_takes_over():
-    p = make([ControlRule(["D", "A"], "TurnLeft", once=True)])
+    p = make([ControlRule(["W", "D"], "TurnLeft", once=True)])
     r = run(p)
     r.press("D")
-    r.press("A")                                             # D then A: D&A
+    r.press("W")                                             # D then W: W+D
     assert r.playing_group == "TurnLeft" and r.animating
     seen = [r.frame]
     for _ in range(3):
         r.tick()
         seen.append(r.frame)
     assert seen[:2] == [8, 9]                                # the turn plays once ...
-    assert r.playing_group == "WalkLeft"                     # ... then A (the newest key) walks left
-    r.release("D")
-    assert r.playing_group == "WalkLeft"
+    assert r.playing_group == "WalkUpRight"                  # ... then the W+D group takes over
+    r.release("W")
+    assert r.playing_group == "WalkRight"
 
 
 def test_play_once_does_not_fire_again_until_the_keys_are_let_go():

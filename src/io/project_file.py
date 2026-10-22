@@ -12,7 +12,8 @@ from pathlib import Path
 from PIL import Image
 
 from src.core.layers import colours_of, flatten
-from src.core.project import ControlRule, Frame, Group, Project, Rule
+from src.core.project import ControlRule, Frame, Group, Project, Rule, Transition
+from src.core.rules import has_opposites
 from src.core.rules import FPS_CHOICES, MAX_FRAMES, MAX_SIZE, MIN_SIZE, valid_label, valid_project_name
 from src.core.systems import get_system
 
@@ -25,13 +26,13 @@ class ProjectFileError(Exception):
 
 
 def _rule_to_json(r: Rule | None):
-    return None if r is None else {"kind": r.kind, "target": r.target, "loop": r.loop}
+    return None if r is None else {"kind": r.kind, "target": r.target, "loop": r.loop, "once": r.once}
 
 
 def _rule_from_json(d) -> Rule | None:
     if d is None:
         return None
-    return Rule(kind=d["kind"], target=d["target"], loop=bool(d.get("loop", False)))
+    return Rule(kind=d["kind"], target=d["target"], loop=bool(d.get("loop", False)), once=bool(d.get("once", False)))
 
 
 LAYER_FILES = ("fg", "core", "bg")
@@ -72,8 +73,10 @@ def save_project(project: Project, path: str | Path) -> None:
                    for g in project.groups],
         "start_state": _rule_to_json(project.start_state),
         "control_rules": [{"keys": list(r.keys), "group": r.group, "once": r.once, "release": _rule_to_json(r.release),
-                           "from_group": r.from_group}
+                           "only_in": list(r.only_in)}
                           for r in project.control_rules],          # Frame Group Control rules, top rule first
+        "transitions": [{"from": list(t.from_groups), "to": t.to, "play": t.play, "interruptible": t.interruptible}
+                        for t in project.transitions],
         "labels": "numbered",          # labels are name_NNN (NNN = position); files without this are converted on opening
     }
     fd, tmp = tempfile.mkstemp(suffix=".tmp", dir=path.parent)
@@ -195,15 +198,26 @@ def open_project(path: str | Path) -> Project:
                 try:
                     keys = [k for k in d["keys"]]
                     if (keys and all(isinstance(k, str) and k in ("W", "A", "S", "D", "1", "2", "3", "4", "5", "6") for k in keys)
-                            and len(set(keys)) == len(keys) and d["group"] in names
-                            and (not d.get("from_group") or d["from_group"] in names)):
-                        control.append(ControlRule(keys, d["group"], bool(d.get("once", False)), _rule_from_json(d.get("release")),
-                                                   str(d.get("from_group") or "")))
+                            and len(set(keys)) == len(keys) and not has_opposites(keys) and d["group"] in names):
+                        only_in = [str(x) for x in d.get("only_in", [])]
+                        if d.get("from_group"):                       # a v2.0.10 or v2.0.11 file: one group
+                            only_in.append(str(d["from_group"]))
+                        if all(x in names for x in only_in):
+                            control.append(ControlRule(keys, d["group"], bool(d.get("once", False)), _rule_from_json(d.get("release")),
+                                                       only_in))
                 except (KeyError, TypeError, ValueError):
+                    continue
+            transitions = []
+            for d in meta.get("transitions", []):
+                try:
+                    frm = [str(x) for x in d.get("from", [])]
+                    if d["to"] in names and d["play"] in names and d["to"] != d["play"] and all(x in names for x in frm):
+                        transitions.append(Transition(frm, str(d["to"]), str(d["play"]), bool(d.get("interruptible", False))))
+                except (KeyError, TypeError, ValueError, AttributeError):
                     continue
             project = Project(name=name, system=system, width=w, height=h, fps=fps,
                               transparent=transparent, written_files=written, frames=frames, groups=groups,
-                              extra_colours=extra, start_state=_rule_from_json(meta.get("start_state")), control_rules=control, file_path=str(path), dirty=False)
+                              extra_colours=extra, start_state=_rule_from_json(meta.get("start_state")), control_rules=control, transitions=transitions, file_path=str(path), dirty=False)
             if not meta.get("palette_saved"):         # an older project: the palette keeps its old order, then is saved from now on
                 used_now = list(project._used_colours())
                 project.extra_colours = used_now + [c for c in extra if c not in used_now]

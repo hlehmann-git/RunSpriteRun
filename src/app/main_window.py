@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (QAbstractSpinBox, QApplication, QComboBox, QLineE
                                QWidget)
 
 from src.app import edit_flow, save_as_dialog
+from src.app.common import install_wheel_guard
 from src.app.controller import Controller
 from src.app.info_bar import BAR_H, InfoBar
 from src.app import messages
@@ -17,7 +18,9 @@ from src.app.edit_panel import EditPanel
 from src.app.run_panel import RunPanel
 from src.app.set_group_panel import SetFrameGroupPanel
 from src.core import groups as group_rules
-from src.core.rules import MAX_GROUPS
+from src.core.edit import shared_prefix, shortened_names
+from src.core.edit import shorten_names as apply_shorten_names
+from src.core.rules import MAX_GROUPS, make_label
 from src.app.colour_editor import PANEL_H, ColourEditorPanel
 from src.app.palette_panel import PalettePanel
 from src.app.panel import Panel
@@ -27,6 +30,7 @@ from src.core.project import Project
 from src.core.rules import valid_project_name
 from src.app.info_dialogs import AboutDialog, HelpDialog, ProjectInformationDialog
 from src.app.settings_dialog import SettingsDialog
+from src.app.shorten_dialog import ShortenDialog
 from src.app.shrink_dialog import WARNING, ShrinkDialog
 from src.app.reduce_dialog import ReduceDialog
 from src.core.reduce_palette import can_reduce, colour_count, reduce_project
@@ -43,7 +47,7 @@ from pathlib import Path
 EDIT_FRAME_H = 584                      # the Frame view panel in Edit mode (512 px picture)
 EDIT_PALETTE_X = 880                    # the colour card, moved over in Edit mode
 DESIGN_W, DESIGN_H = 1280, 948          # 800 + the 24 px information bar under the menu bar + 124 px of spare space (1.b)
-RUN_KEYS = {getattr(Qt, f"Key_{c}"): c for c in "WASD123456"}     # digits: top row and keypad share these codes
+RUN_KEYS = {getattr(Qt, f"Key_{c}"): c for c in "WASD1234567890"}     # digits: top row and keypad share these codes
 
 # name, x, y, w, h  (logical pixels, section 5.1 region table)
 REGIONS = [
@@ -65,6 +69,7 @@ TOOL_KEYS = {Qt.Key_P: "pencil", Qt.Key_E: "eraser", Qt.Key_B: "bucket", Qt.Key_
 class MainWindow(QMainWindow):
     def __init__(self, settings=None) -> None:
         super().__init__()
+        install_wheel_guard()
         self.setWindowTitle("RunSpriteRun")
         self._large = False                                       # Edit mode layout: a larger Frame view
         self.setMinimumSize(DESIGN_W, DESIGN_H)
@@ -107,9 +112,6 @@ class MainWindow(QMainWindow):
         self.controller.history_changed.connect(self._update_save_action)
         self.set_project_active(False)
 
-        self.panels["RunSpriteRun window"].toggle_requested.connect(self.toggle_run)
-        self.f5 = QShortcut(QKeySequence("F5"), self)             # start / stop RunSpriteRun (FR-3.3)
-        self.f5.activated.connect(self.toggle_run)
         QApplication.instance().installEventFilter(self)
 
     def _place_colour_card(self, palette_h: int) -> None:
@@ -172,6 +174,7 @@ class MainWindow(QMainWindow):
         self.menu_edit.addSeparator()
         self.act_shrink = a(self.menu_edit, "Shrink Sprite")
         self.act_reduce = a(self.menu_edit, "Reduce Palette")
+        self.act_shorten = a(self.menu_edit, "Shorten Frame Names")
         self.act_new_group = a(self.menu_group, "New Group", "Ctrl+G")
         self.act_delete_group = a(self.menu_group, "Delete Group")
         self.menu_group.addSeparator()
@@ -185,6 +188,7 @@ class MainWindow(QMainWindow):
         self.act_redo.triggered.connect(lambda: self.controller.edit.redo() if self.controller.edit.mode else self.controller.redo())
         self.act_shrink.triggered.connect(self.shrink_sprite)
         self.act_reduce.triggered.connect(self.reduce_palette)
+        self.act_shorten.triggered.connect(self.shorten_names)
         self.act_new.triggered.connect(self.new_project)
         self.act_open.triggered.connect(self.open_project_dialog)
         self.act_save.triggered.connect(self.save)
@@ -198,7 +202,7 @@ class MainWindow(QMainWindow):
         self.act_help.triggered.connect(lambda: HelpDialog(self).exec())
         self.act_about.triggered.connect(lambda: AboutDialog(self).exec())
 
-    # ---- RunSpriteRun: F5 and the keys -----------------------------------------------------------------
+    # ---- RunSpriteRun: Esc and the keys -----------------------------------------------------------------
     def _lock_for_add(self, on: bool) -> None:
         """The "add new colour" mode: the menus, the timeline, the group panel and the run and preview windows are
         switched off. The Frame view stays on for the pipette, and the Edit panel and Colour editor lock themselves."""
@@ -249,7 +253,11 @@ class MainWindow(QMainWindow):
                         self.controller.key_press(key)
                     return True
                 if not event.isAutoRepeat() and self.controller.start_with_key(key):
-                    return True                           # a key with a group starts RunSpriteRun (as F5 does)
+                    return True                           # a key with a group starts RunSpriteRun
+        elif (t == QEvent.KeyPress and event.key() == Qt.Key_Escape and self.controller.running
+              and not self.controller.add_mode and QApplication.activeModalWidget() is None and self.isActiveWindow()):
+            self.controller.stop_run()                        # Esc stops RunSpriteRun and returns to the start state
+            return True
         elif (t == QEvent.KeyPress and self.controller.add_mode and event.key() == Qt.Key_Escape
               and QApplication.activeModalWidget() is None):
             self.controller.cancel_add_mode()                 # Esc cancels adding a new colour
@@ -400,6 +408,8 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event) -> None:
         if self.confirm_close():
+            if self.control_window is not None:
+                self.control_window._apply()          # the Frame Group Control window has no X: it goes with the main window
             event.accept()
         else:
             event.ignore()
@@ -449,6 +459,29 @@ class MainWindow(QMainWindow):
 
     def show_blank_sheet(self) -> None:
         BlankSheetDialog(self).exec()          # needs no project (FR-4.9)
+
+    def shorten_names(self) -> None:
+        """Edit > Shorten Frame Names: swap the text every frame name starts with for a shorter text. It cannot be undone,
+        so the Undo history is cleared; the project counts as unsaved."""
+        c = self.controller
+        p = c.project
+        if p is None or c.edit.mode or not p.frames or not shared_prefix(p):
+            return
+        dlg = ShortenDialog(self, p)
+        if not dlg.exec():
+            return
+        new = dlg.replacement()
+        names = shortened_names(p, new)
+        first = p.frames[0].label
+        if not messages.choose(self, "Shorten every frame name?",
+                               f"{first} becomes {make_label(names[0], 1)}. This cannot be undone.", "Shorten", "Cancel"):
+            return
+        selected = c.selected
+        apply_shorten_names(p, new)
+        self.set_project(p)                              # every panel follows the new names; the Undo history starts again
+        c.select(min(selected, len(p.frames) - 1))
+        p.dirty = True
+        self._update_save_action()
 
     def shrink_sprite(self) -> None:
         """Edit > Shrink Sprite: ask how small, ask again, then shrink every frame. It cannot be undone, so the Undo
@@ -543,6 +576,7 @@ class MainWindow(QMainWindow):
         self.act_redo.setEnabled(e.can_redo if e.mode else self.controller.can_redo)
         p = self.controller.project
         self.act_shrink.setEnabled(p is not None and bool(p.frames) and not e.mode)    # not while editing
+        self.act_shorten.setEnabled(p is not None and bool(p.frames) and not e.mode and bool(shared_prefix(p)))
         self.act_reduce.setEnabled(p is not None and bool(p.frames) and not e.mode and not p.system.is_fixed
                                    and can_reduce(p))
 

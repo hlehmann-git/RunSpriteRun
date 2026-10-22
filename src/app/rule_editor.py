@@ -65,6 +65,7 @@ class RuleEditor(QWidget):
         self.radio_group.setChecked(False)
         self.buttons.setExclusive(True)
         self.loop.setChecked(False)
+        self._once = bool(rule is not None and rule.kind == "group" and rule.once)       # "play once" is set in Frame Group Control; keep it
         if rule is not None and rule.kind == "frame":
             self.radio_frame.setChecked(True)
             self.frame_combo.setCurrentIndex(max(0, self.frame_combo.findData(rule.target)))
@@ -81,5 +82,6 @@ class RuleEditor(QWidget):
         if self.radio_frame.isChecked() and self.frame_combo.count():
             return Rule("frame", self.frame_combo.currentData())
         if self.radio_group.isChecked() and self.group_combo.count():
-            return Rule("group", self.group_combo.currentData(), self.loop.isChecked())
+            return Rule("group", self.group_combo.currentData(), self.loop.isChecked(),
+                        getattr(self, "_once", False) and not self.loop.isChecked())
         return None

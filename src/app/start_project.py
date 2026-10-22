@@ -17,7 +17,8 @@ from src.core.factory import create_project
 from src.core.importer import ACCEPTED_SUFFIXES, import_files, msg_frame_limit, msg_size, natural_key, read_size
 from src.core import sheet_import
 from src.core.project import Project
-from src.core.rules import DEFAULT_FPS, FPS_CHOICES, MAX_FRAMES, MAX_SIZE, MIN_SIZE, valid_project_name
+from src.core.rules import (DEFAULT_FPS, FPS_CHOICES, MAX_FRAMES, MAX_SIZE, MIN_SIZE, NAME_MAX, clean_name,
+                            valid_name, valid_project_name)
 from src.core.colour import snap_colour
 from src.core.importer import ImportedFrame, ImportResult
 from src.core.systems import SYSTEMS, get_system
@@ -224,7 +225,21 @@ class StartProjectDialog(QDialog):
         self.sheet_hint = QLabel("PNG, BMP or GIF. Boxes are found by their colour; empty boxes are left out.")
         self.sheet_hint.setStyleSheet(GREY)
         self.sheet_hint.setContentsMargins(INDENT, 0, 0, 0)
-        grid.addWidget(self.sheet_hint, 13, 0, 1, 2)
+        name_row = QHBoxLayout()
+        name_row.setContentsMargins(INDENT, 0, 0, 0)
+        name_row.setSpacing(8)
+        self.frame_name_label = QLabel("Frame name")
+        self.frame_name = QLineEdit()                     # the frames become <name>_001, <name>_002 ...
+        self.frame_name.setMaxLength(NAME_MAX - 4)        # room for the _NNN number
+        self.frame_name.setPlaceholderText("e.g. Rick")
+        name_row.addWidget(self.frame_name_label)
+        name_row.addWidget(self.frame_name, 1)
+        sheet_extra = QVBoxLayout()
+        sheet_extra.setContentsMargins(0, 0, 0, 0)
+        sheet_extra.setSpacing(4)
+        sheet_extra.addLayout(name_row)
+        sheet_extra.addWidget(self.sheet_hint)
+        grid.addLayout(sheet_extra, 13, 0, 1, 2)
 
         self.files_radio = QRadioButton("Import image files")
         self.mode = QButtonGroup(self)
@@ -313,7 +328,8 @@ class StartProjectDialog(QDialog):
 
         sheet = self.sheet_mode()
         blank = self.blank_mode()
-        for w_ in (self.sheet_browse, self.box_colour, self.fill_colour, self.sheet_hint):
+        for w_ in (self.sheet_browse, self.box_colour, self.fill_colour, self.sheet_hint,
+                   self.frame_name, self.frame_name_label):
             w_.setEnabled(sheet)
         self.browse.setEnabled(not sheet and not blank)
         self.blank_frames.setEnabled(blank)
@@ -420,6 +436,7 @@ class StartProjectDialog(QDialog):
 
     def _clear_sheet(self) -> None:
         self.sheet_name.clear()
+        self.frame_name.clear()
         self._sheet_path = None
         self._sheet_image = None
         self._grid = sheet_import.SheetGrid()
@@ -448,6 +465,7 @@ class StartProjectDialog(QDialog):
         self._sheet_path = Path(path)
         self.sheet_name.setText(self._sheet_path.name)
         self.sheet_name.setCursorPosition(0)
+        self.frame_name.setText(clean_name(self._sheet_path.stem)[:NAME_MAX - 4])
         self._scan_sheet()
 
     def _sheet_colours(self) -> None:
@@ -504,7 +522,12 @@ class StartProjectDialog(QDialog):
             messages.warn(self, "The box colour and the transparent colour must be different.")
             return
         system = self.selected_system()
-        result = sheet_import.import_sheet(self._sheet_image, self._sheet_path.stem, g,
+        frame_name = self.frame_name.text()
+        if not valid_name(frame_name, NAME_MAX - 4):
+            messages.warn(self, "The frame name can only use letters, numbers, - and _ (no spaces), "
+                                f"up to {NAME_MAX - 4} characters.")
+            return
+        result = sheet_import.import_sheet(self._sheet_image, frame_name, g,
                                            self.fill_colour.colour, system)
         if result.rejected:
             messages.warn(self, result.rejected)

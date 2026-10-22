@@ -16,7 +16,8 @@ LABEL_MAX = 64          # name + _ + three digits
 GROUP_NAME_MAX = 20
 DIAGONALS = {"W+A": ("W", "A"), "W+D": ("W", "D"), "S+D": ("S", "D"), "S+A": ("S", "A")}   # two direction keys held together
 KEY_LABELS = {"W+A": "W+A (up-left)", "W+D": "W+D (up-right)", "S+D": "S+D (down-right)", "S+A": "S+A (down-left)"}
-KEYS = ("W", "A", "S", "D", "W+A", "W+D", "S+D", "S+A", "1", "2", "3", "4", "5", "6")
+ACTION_KEYS = ("7", "8", "9", "0")       # "Action animations": played by the game, not by the controller; never combined with other keys
+KEYS = ("W", "A", "S", "D", "W+A", "W+D", "S+D", "S+A", "1", "2", "3", "4", "5", "6") + ACTION_KEYS
 
 
 def valid_name(text: str, max_len: int) -> bool:
@@ -86,12 +87,21 @@ def keys_for(system_name: str) -> tuple[str, ...]:
 
 def key_available(system_name: str, key: str | None) -> bool:
     """False for a group's key that the system's controller does not have (a fire button above its count)."""
-    if key is None or key in KEYS[:8]:
+    if key is None or key in KEYS[:8] or key in ACTION_KEYS:
         return True
     return key in keys_for(system_name)
 
 
 def keys_text(keys) -> str:
     """Keys in a fixed order for display: W A S D first, then the buttons, joined with '+' (e.g. W+D+1)."""
-    order = {k: i for i, k in enumerate(("W", "A", "S", "D", "1", "2", "3", "4", "5", "6"))}
+    order = {k: i for i, k in enumerate(("W", "A", "S", "D", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0"))}
     return "+".join(sorted(keys, key=lambda k: order.get(k, 99)))
+
+
+OPPOSITE = {"W": "S", "S": "W", "A": "D", "D": "A"}     # a joystick or pad cannot press these together
+
+
+def has_opposites(keys) -> bool:
+    """True if a list of keys holds a pair that a joystick cannot press together (W and S, or A and D)."""
+    ks = set(keys)
+    return any(OPPOSITE[k] in ks for k in ks if k in OPPOSITE)

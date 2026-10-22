@@ -3,14 +3,19 @@ and the time passing. No UI code here; the app calls tick() once per frame time 
 from __future__ import annotations
 
 from .project import Project, Rule
-from .rules import DIAGONALS
+from .rules import ACTION_KEYS, DIAGONALS, OPPOSITE
 
 
 class Runner:
     def __init__(self, project: Project) -> None:
         self.project = project
         self.running = False
-        self.held: list[str] = []                 # keys held that matter (own group, or part of a diagonal group), oldest first
+        self.held: list[str] = []                 # keys that count (own group, part of a diagonal group, or used by a rule), oldest first;
+                                                  # of two opposite keys (W and S, A and D) only the one pressed first counts
+        self._physical: list[str] = []            # every key that matters and is down, oldest first
+        self._trans = None                        # the Transition that is playing, if any
+        self._trans_rest: tuple | None = None     # the token the transition leads to (its resting state if every key is let go)
+        self._rest_group: str | None = None       # a release that plays a group once: when it ends, that group's own On Release applies
         self._current: tuple | None = None        # what is playing: ("key", key) for a group's own key (a diagonal such as W+D counts as
                                                   # one key), or ("rule", index) for a Frame Group Control rule
         self._once = False                        # the sequence playing is a play-once one: it ends instead of looping
@@ -31,6 +36,7 @@ class Runner:
         return next((g for g in self.project.groups if g.key == key), None)
 
     def _play(self, group, loop: bool) -> None:
+        self._rest_group = None
         self._once = not loop                         # a group that is not looped plays through once (Frame Group Control rules)
         self._seq = list(range(group.first, group.last + 1))
         self._pos = 0
@@ -38,6 +44,7 @@ class Runner:
         self.playing_group = group.name
 
     def _hold(self, frame: int) -> None:
+        self._rest_group = None
         self._once = False
         self._seq = []
         self._pos = 0
@@ -56,6 +63,9 @@ class Runner:
             if g is not None:
                 if rule.loop:
                     self._play(g, True)               # a resting loop animates
+                elif rule.once:
+                    self._play(g, False)              # plays through one time, then this group's own On Release applies
+                    self._rest_group = g.name
                 else:
                     self._hold(g.first)               # Loop off: nothing animates, the group's first frame is shown
                 return
@@ -65,17 +75,21 @@ class Runner:
         """The start state; if it was never set (or its target is gone) frame 1 is held."""
         self._apply(self.project.start_state, 0)
 
-    # ---- F5 -------------------------------------------------------------------------------------
+    # ---- start and stop ----------------------------------------------------------------------
     def start(self) -> None:
         self.held.clear()
+        self._physical.clear()
+        self._trans = None
         self._current = None
         self._done.clear()
         self.running = True
         self._show_start_state()
 
     def stop(self) -> None:
-        """F5 again: stop and return the display to the start state. There is no pause."""
+        """Stop and return the display to the start state. There is no pause."""
         self.held.clear()
+        self._physical.clear()
+        self._trans = None
         self._current = None
         self._done.clear()
         self.running = False
@@ -105,8 +119,8 @@ class Runner:
         showing = self.showing_group()
         for i, r in enumerate(self.project.control_rules):
             if i not in self._done and r.keys and set(r.keys) <= held and self._group_named(r.group) is not None:
-                # "only when showing": the rule that is already playing keeps going even though its own frames are now on screen
-                if r.from_group and r.from_group != showing and ("rule", i) != self._current:
+                # "only if in": the rule that is already playing keeps going even though its own frames are now on screen
+                if r.only_in and showing not in r.only_in and ("rule", i) != self._current:
                     continue
                 return ("rule", i)
         key = self.effective_key()
@@ -125,17 +139,64 @@ class Runner:
         extra = [d for d, (a, b) in DIAGONALS.items() if a in self.held and b in self.held]
         return list(self.held) + extra
 
+    def _recompute(self) -> None:
+        """The keys that count: of two opposite keys (W and S, A and D) only the one pressed first, like a joystick."""
+        act = next((k for k in self._physical if k in ACTION_KEYS), None)
+        if act is not None:                       # an action key stands alone: nothing else counts while it is down
+            self.held = [act]
+            return
+        eff: list[str] = []
+        for k in self._physical:
+            if OPPOSITE.get(k) in eff:
+                continue
+            eff.append(k)
+        self.held = eff
+
+    def _find_transition(self, showing: str | None, to_name: str):
+        """The transition for going to `to_name` from the group on screen: a row naming that group beats a row for any group."""
+        if showing == to_name:
+            return None
+        rows = [t for t in self.project.transitions if t.to == to_name and self._group_named(t.play) is not None]
+        for t in rows:
+            if t.from_groups and showing in t.from_groups:
+                return t
+        return next((t for t in rows if not t.from_groups), None)
+
+    def _start(self, token: tuple, allow_transition: bool = True) -> None:
+        """Start what the token names, first playing its transition (once) when one is set for this change of group."""
+        rules = self.project.control_rules
+        if token[0] == "rule":
+            r = rules[token[1]]
+            group, once = self._group_named(r.group), r.once
+        else:
+            group, once = self._group_for_key(token[1]), False
+        if group is None:
+            return
+        if allow_transition:
+            t = self._find_transition(self.showing_group(), group.name)
+            if t is not None:
+                self._play(self._group_named(t.play), False)
+                self._trans, self._trans_rest = t, token
+                return
+        self._trans = None
+        self._play(group, not once)
+
     def _switch(self) -> None:
         rules = self.project.control_rules
         held = set(self.held)
         self._done = {i for i in self._done if i < len(rules) and set(rules[i].keys) <= held}   # let go of the keys: it can fire again
         now = self._wanted()
         if now is not None and now != self._current:
-            if now[0] == "rule":
-                r = rules[now[1]]
-                self._play(self._group_named(r.group), not r.once)    # whatever was playing stops; the new group starts at its first frame
+            if self._trans is None:
+                self._start(now)                          # whatever was playing stops; the new group (or its transition) starts
+            elif self._trans.interruptible:
+                self._trans = None                        # a change of keys stops an interruptible transition at once
+                self._start(now, False)
             else:
-                self._play(self._group_for_key(now[1]), True)
+                self._trans_rest = now                    # it plays through, then follows the keys
+        elif now is None and self._trans is not None and self._trans.interruptible:
+            self._trans = None
+            self._once = False
         self._current = now
 
     def _rest_after(self, token: tuple) -> None:
@@ -155,26 +216,28 @@ class Runner:
 
     def press(self, key: str) -> bool:
         """A key goes down. Returns False if it was ignored (not running, no group for it, auto-repeat)."""
-        if not self.running or not self._matters(key) or key in self.held:
+        if not self.running or not self._matters(key) or key in self._physical:
             return False
-        self.held.append(key)
+        self._physical.append(key)
+        self._recompute()
         self._switch()
         return True
 
     def release(self, key: str) -> bool:
-        if not self.running or key not in self.held:
+        if not self.running or key not in self._physical:
             return False
         before = self._current
-        self.held.remove(key)
+        self._physical.remove(key)
+        self._recompute()
         self._switch()
-        if self._current is None and before is not None:   # nothing playable is held: the released group's resting state
+        if self._current is None and before is not None and self._trans is None:   # nothing playable is held: the released group's resting state
             self._rest_after(before)
         return True
 
     def release_all(self) -> None:
         """Window lost focus, or keys were let go while something else had the keyboard."""
-        while self.held:
-            self.release(self.held[-1])
+        while self._physical:
+            self.release(self._physical[-1])
 
     # ---- time -----------------------------------------------------------------------------------
     def tick(self) -> bool:
@@ -194,7 +257,28 @@ class Runner:
     def _finish(self) -> bool:
         """A play-once rule reached its last frame while its keys are still held: it will not fire again until they are
         let go, and the next matching rule (or the newest key's group) takes over; with none, its resting state."""
+        if self._trans is not None:                   # a transition ended: follow the keys held now, else rest where it was heading
+            self._trans = None
+            self._once = False
+            now = self._wanted()
+            if now is not None:
+                self._start(now, False)
+                self._current = now
+            else:
+                token, self._current = self._trans_rest, None
+                if token is not None:
+                    self._rest_after(token)
+            return True
         before = self._current
+        if before is None and self._rest_group is not None:   # a release that plays a group once ended: that group's own On Release
+            g = self._group_named(self._rest_group)
+            self._rest_group = None
+            self._once = False
+            if g is None:
+                self._hold(self.frame)
+            else:
+                self._apply(g.on_release, g.last)
+            return True
         if before is not None and before[0] == "rule":
             self._done.add(before[1])
         self._once = False

@@ -9,7 +9,7 @@ DISABLED = QColor(120, 120, 128)
 ACCENT = QColor(80, 140, 220)
 BUTTON = QColor(66, 70, 82)           # lighter than the panels so buttons stand out
 
-# Buttons that can be switched on (F5 Toggle, Play): the lit state is a clearly lighter grey with a white border.
+# Buttons that can be switched on (Play, the Scale switch): the lit state is a clearly lighter grey with a white border.
 TOGGLE_BUTTON_STYLE = (
     "QPushButton { background: #424652; border: 1px solid #7a8094; border-radius: 4px; padding: 0 2px; }"
     "QPushButton:hover { background: #4e5362; }"

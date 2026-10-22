@@ -1,4 +1,4 @@
-"""The "Only after" condition on a Frame Group Control rule (v2.0.10): a turn that plays only when the
+"""The "Only if in" condition on a Frame Group Control rule (v2.0.12): a turn that plays only when the
 character is facing the other way."""
 import os
 
@@ -25,8 +25,8 @@ def make(rules=None):
     gs = [Group("WalkLeft", 0, 2, on_release=Rule("frame", "f2")), Group("TurnLeft", 3, 4),
           Group("WalkRight", 5, 7, on_release=Rule("frame", "f7")), Group("TurnRight", 8, 9)]
     if rules is None:
-        rules = [ControlRule(["A"], "TurnLeft", True, None, "WalkRight"), ControlRule(["A"], "WalkLeft"),
-                 ControlRule(["D"], "TurnRight", True, None, "WalkLeft"), ControlRule(["D"], "WalkRight")]
+        rules = [ControlRule(["A"], "TurnLeft", True, None, ["WalkRight"]), ControlRule(["A"], "WalkLeft"),
+                 ControlRule(["D"], "TurnRight", True, None, ["WalkLeft"]), ControlRule(["D"], "WalkRight")]
     return Project("P", get_system("Amiga"), 4, 4, frames=frames, groups=gs, control_rules=rules, dirty=False)
 
 
@@ -87,12 +87,12 @@ def test_the_turn_is_not_interrupted_by_another_key_while_it_plays():
 def test_rename_delete_and_check_follow_the_condition():
     p = make()
     groups.set_control_rules(p, p.control_rules)
-    bad = ControlRule(["A"], "WalkLeft", False, None, "Nope")
+    bad = ControlRule(["A"], "WalkLeft", False, None, ["Nope"])
     with pytest.raises(groups.GroupError):
         groups.check_control_rule(p, bad)
-    assert any("Only after" in x or "Frame Group Control" in x for x in groups.rules_pointing_to(p, "WalkRight"))
+    assert any("Only if in" in x or "Frame Group Control" in x for x in groups.rules_pointing_to(p, "WalkRight"))
     edit.delete_group(p, "WalkRight")
-    assert all(r.from_group != "WalkRight" and r.group != "WalkRight" for r in p.control_rules)
+    assert all("WalkRight" not in r.only_in and r.group != "WalkRight" for r in p.control_rules)
     assert len(p.control_rules) == 2                    # the turn that needed WalkRight and the rule that plays it went with it
 
 
@@ -100,19 +100,19 @@ def test_save_open_and_export_keep_the_condition(tmp_path):
     p = make()
     save_project(p, tmp_path / "x.rsr")
     back = open_project(tmp_path / "x.rsr")
-    assert [r.from_group for r in back.control_rules] == ["WalkRight", "", "WalkLeft", ""]
+    assert [r.only_in for r in back.control_rules] == [["WalkRight"], [], ["WalkLeft"], []]
     rows = rules_export.rule_rows(p)
-    assert rows[0]["only_after"] == "WalkRight" and rows[1]["only_after"] is None
+    assert rows[0]["only_if_in"] == ["WalkRight"] and rows[1]["only_if_in"] is None
     data = json.loads(rules_export.rules_json(p))
-    assert data["rules"][0]["only_after"] == "WalkRight"
+    assert data["rules"][0]["only_if_in"] == ["WalkRight"]
     lines = rules_export.rules_text(p).splitlines()
-    assert "Only after" in lines[2] and lines[3].split("\t")[3] == "WalkRight"
+    assert "Only if in" in lines[2] and lines[3].split("\t")[3] == "WalkRight"
 
 
 def test_an_old_file_has_no_condition(tmp_path):
     p = make([ControlRule(["A"], "WalkLeft")])
     save_project(p, tmp_path / "o.rsr")
-    assert open_project(tmp_path / "o.rsr").control_rules[0].from_group == ""
+    assert open_project(tmp_path / "o.rsr").control_rules[0].only_in == []
 
 
 @pytest.fixture(scope="module")
@@ -131,9 +131,8 @@ def test_the_window_has_the_drop_down_and_a_change_is_applied(app, monkeypatch):
     w.show_control_window()
     win = w.control_window
     win.rebuild()
-    box = win._from[0]
-    assert box.currentData() == "WalkRight" and win._from[1].currentData() == ""
-    box.setCurrentIndex(box.findData("WalkLeft"))
-    assert w.controller.project.control_rules[0].from_group == "WalkLeft"
+    assert win._from[0].text().startswith("WalkRight") and win._from[1].text().startswith("Any frame")
+    win._edit(0, only_in=["WalkLeft", "TurnLeft"])
+    assert w.controller.project.control_rules[0].only_in == ["WalkLeft", "TurnLeft"]
     w.controller.undo()
-    assert w.controller.project.control_rules[0].from_group == "WalkRight"
+    assert w.controller.project.control_rules[0].only_in == ["WalkRight"]

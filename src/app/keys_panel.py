@@ -12,9 +12,10 @@ from PySide6.QtWidgets import QLabel, QWidget
 from src.app.controller import Controller
 from src.app.panel import Panel
 
-HELD_BG, HELD_FG = QColor("#9fd3ff"), QColor("#14141a")      # a held key is filled with its group's colour (this if none)
+HELD_BG, HELD_FG, HELD_EDGE = QColor("#2e4838"), QColor("#ffffff"), QColor("#6eaa7d")      # a held key is filled with its group's colour (this if none)
 KEY_BG, KEY_FG, KEY_EDGE = QColor("#1e1f24"), QColor("#e6e8ee"), QColor("#78808c")
-PAD_W, PAD_H = 156, 142
+PAD_W, PAD_H = 156, 184
+AMBER = QColor("#d6a046")
 # (key, centre x, centre y, size, round?) inside the pad: W A S D as a cross, the four "+" diagonals between them, 1 to 6 as round buttons
 _CX, _CY, _STEP = 78, 52, 31
 KEY_LAYOUT = (
@@ -23,6 +24,7 @@ KEY_LAYOUT = (
      ("W+A", _CX - _STEP, _CY - _STEP, 20, False), ("W+D", _CX + _STEP, _CY - _STEP, 20, False),
      ("S+A", _CX - _STEP, _CY + _STEP, 20, False), ("S+D", _CX + _STEP, _CY + _STEP, 20, False)]
     + [(str(n), 21 + 23 * (n - 1), 118, 20, True) for n in range(1, 7)]      # 1 to 6 in one row under the cross
+    + [(k, 44 + 23 * i, 164, 20, True) for i, k in enumerate("7890")]       # Action animations: played by the game, in amber
 )
 
 
@@ -49,13 +51,20 @@ class KeyPad(QWidget):
         p.setPen(Qt.NoPen)
         p.setBrush(QColor("#2c2e38"))
         p.drawRect(_CX - 12, _CY - 12, 25, 25)           # the middle of the cross
+        p.setPen(QPen(QColor("#50566a"), 1))
+        p.drawLine(14, 138, PAD_W - 14, 138)
         font = QFont(self.font())
         font.setBold(True)
+        font.setPixelSize(9)
+        p.setFont(font)
+        p.setPen(AMBER)
+        p.drawText(QRectF(0, 141, PAD_W, 12), Qt.AlignCenter, "ACTION ANIMATIONS")
         for key, cx, cy, size, round_ in KEY_LAYOUT:
             on = key in self.held
             rect = QRectF(cx - size / 2, cy - size / 2, size, size)
+            action = key in "7890"
             fill = (self.colour_of(key) or HELD_BG) if on else KEY_BG
-            p.setPen(QPen(fill if on else KEY_EDGE, 1))
+            p.setPen(QPen(AMBER if action else HELD_EDGE if on else KEY_EDGE, 2.5 if on else 1.5 if action else 1))
             p.setBrush(fill)
             if round_:
                 p.drawEllipse(rect)

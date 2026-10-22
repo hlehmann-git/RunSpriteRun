@@ -33,7 +33,7 @@ The program installs for your own Windows user (in AppData\Local\Programs), so i
 
 1. When the program opens, the **Start Project** box appears. Give the project a name, choose a target system, choose a frame size and press **Create Project** (see section 3).
 2. The main window opens with your frames along the bottom.
-3. Click a frame in the timeline to look at it, press **Play** in the Frame Group Preview to see a group animate, or press **F5** to try the sprite with the keyboard.
+3. Click a frame in the timeline to look at it, press **Play** in the Frame Group Preview to see a group animate, or press a key that has a group to try the sprite with the keyboard.
 4. Press **Ctrl+S** to save.
 
 Tip: to look around before making anything, press **Open Project** in the Start Project box and open one of the examples.
@@ -43,7 +43,7 @@ Tip: to look around before making anything, press **Open Project** in the Start 
 - **Menu bar** (top): File, Edit, Group, Help and About.
 - **Frame view** (top left): the selected frame, enlarged, with a pixel grid. This is where you draw in Edit mode.
 - **Frame Group Preview** (middle): plays a group of frames on a loop.
-- **RunSpriteRun window** (right): the live test. Press F5 and use the keys to control the sprite.
+- **RunSpriteRun window** (right): the live test. Use the keys to control the sprite, and press Esc to stop.
 - **Palette and colour editor** (top right): the project's colours and the tools to change them.
 - **Set Frame Group panel**: where groups of frames are defined; its Set Rules button opens Frame Group Control, where keys are given to groups.
 - **Timeline and frames** (bottom): every frame in order, with a key pad picture at its left end.
@@ -180,7 +180,7 @@ A **frame group** is a named run of frames that can be played, and assigned to a
 
 - **Frame view** (top left): the selected frame, enlarged, with a pixel grid. It does not play. In Edit mode it becomes the drawing surface.
 - **Frame Group Preview** (middle): choose a group from its list and press **Play** to loop it. The back and forward triangles step through the group's frames. It ignores keys.
-- **RunSpriteRun window** (right): the live test. Press **F5** to start and stop it (the **F5 Toggle** button does the same). Its **Scale** toggle switches between the whole-number zoom and actual size (one sprite pixel = one screen pixel), and **Zoom -** / **Zoom +** change the size.
+- **RunSpriteRun window** (right): the live test. Press a key that has a group to start it, and **Esc** to stop it. Its **Scale** toggle switches between the whole-number zoom and actual size (one sprite pixel = one screen pixel), and **Zoom -** / **Zoom +** change the size.
 
 ### Making a group
 
@@ -227,7 +227,7 @@ To make a rule:
 1. Press + Add rule. A small box asks for the keys. Click every key that must be held together (for example W, D and 1) and press OK. The new rule goes to the top of the list.
 2. Choose the group that plays. The list holds the groups you have already made.
 3. Choose Loop (the group repeats while the keys are held) or Play once (it plays through one time).
-4. Under "When all keys are released", choose what happens when you let go: the group's own On Release rule (the default), Go To Frame, or Go to Group with an optional Loop.
+4. Under "When all keys are released", choose what happens when you let go: the group's own On Release rule (the default), Go To Frame, or Go to Group (Loop, Play once, or First frame only). Play once plays the group one time and then that group's own release choice applies.
 
 How the rules work:
 
@@ -237,30 +237,36 @@ How the rules work:
 - **Group keys.** Under the rules, one row for each group that has a key of its own. They apply after your rules: a diagonal beats a single key, otherwise the key pressed last wins. You can change a group's key, and its release choice (Stay on the last frame, Go To Frame or Go to Group), in these rows. A key that your system's controller does not have is marked "not on this system's controller", but still works.
 - **Changing groups.** If you rename a group, its rules follow. If you delete a group, or delete frames that leave it empty, the rules that play it are removed and the program lists them first.
 
-Every change in the window is applied at once and can be undone with Ctrl+Z. The rules are saved in the project, and Save and Export also write them as text and JSON files (see Saving and Export).
+Every change in the window is applied at once and can be undone with Ctrl+Z. Apply, Esc and the X in the title bar all just close the window. The rules are saved in the project, and Save and Export also write them as text and JSON files (see Saving and Export).
 
-**Making a turn: Only after.** Each rule has an "Only after" list under its keys (the default is Any frame). Choose a group there and the rule fires only if the frame on screen is in that group. The program has no setting for which way a character faces: it looks at the frame it is showing. This is how you make a character turn before it walks the other way.
+**Making a turn: Only if in.** Each rule has an "Only if in" button under its keys (the default is Any frame). Click it and tick one or more groups: the rule fires only if the frame on screen is in one of them. Ticking several groups lets one rule depend on every 'facing right' group, for example. The program has no setting for which way a character faces: it looks at the frame it is showing. This is how you make a character turn before it walks the other way.
 
 Example, for a character with the groups WalkLeft, WalkRight and TurnLeft. A is left and D is right. Set these rules from the top:
 
-1. A, Only after WalkRight: play TurnLeft, Play once. When all keys are released: Go To Frame, a frame inside WalkLeft.
+1. A, Only if in WalkRight: play TurnLeft, Play once. When all keys are released: Go To Frame, a frame inside WalkLeft.
 2. D, Any frame: play WalkRight, Loop. When all keys are released: Go To Frame, a frame inside WalkRight.
 3. A, Any frame: play WalkLeft, Loop. When all keys are released: Go To Frame, a frame inside WalkLeft.
 
-Hold D and Hercules walks right; let go and he stands. Press A and the left turn plays once, then he walks left. Press A again while already facing left and he walks straight away, because he is no longer showing a WalkRight frame. Keep the turn rule above the plain A rule, or the turn never plays. Each walk group's release frame must lie inside that group, otherwise the program thinks the character is facing the wrong way. For a turn the other way, add a TurnRight group and a rule D, Only after WalkLeft, above rule 2.
+Hold D and Hercules walks right; let go and he stands. Press A and the left turn plays once, then he walks left. Press A again while already facing left and he walks straight away, because he is no longer showing a WalkRight frame. Keep the turn rule above the plain A rule, or the turn never plays. Each walk group's release frame must lie inside that group, otherwise the program thinks the character is facing the wrong way. For a turn the other way, add a TurnRight group and a rule D, Only if in WalkLeft, above rule 2. A turn can also be set as a Transition (below), which needs no extra rule.
 
-If you rename a group, the Only after lists follow it. If you delete a group, a rule that plays it or is only after it is removed, and the program lists those rules first.
+If you rename a group, the Only if in lists follow it. If you delete a group, a rule that plays it is removed, and the group is taken out of every Only if in list (a rule whose list becomes empty is removed). The program lists these first.
+
+**Opposite keys.** A joystick cannot press opposite directions together, so neither can the keyboard here. W and S, and A and D, are never counted together and cannot be chosen for a rule or a group key (the opposite key is greyed out in the Keys held box). While you hold A, pressing D does nothing; if you let go of A while still holding D, D starts counting as a normal key. You can add W or S to A or D to make a diagonal.
+
+**Transitions.** Under the rules is a Transitions section: going FROM one group, several groups or Any group, TO a group, play a transition group ONCE first. The transition group has no key of its own. For example, going from WalkRight to WalkLeft plays TurnLeft once, then WalkLeft. A row that names the from-groups beats an Any row. Starts count too (Idle to Walk). Transitions apply when a key press changes the group; stops use the group's release choice (Go to Group, play once). Tick 'Can be interrupted' if a new key press should cut a transition short; by default it finishes first.
+
+**Action animations (7, 8, 9, 0).** Some animations are not played by the controller but by the game, for example a death when a character touches a spike. Keys 7, 8, 9 and 0 let you test them. They are shown apart, in amber, under the 1 to 6 buttons on the key pad and in Frame Group Control, and work on every system. Set them up like any rule: Add rule, choose the amber 7, 8, 9 or 0 in the Keys held box, choose the group, Loop or Play once, and what happens on release (for example Play once, then Go To Frame on the last frame so the last frame stays). An action key stands alone: it cannot be combined with any other key, and while it is held the controller keys are ignored.
 
 ### Running the animation
 
-1. Press **F5**. RunSpriteRun shows frame 1 until you press a key.
+1. Press a key that has a group. RunSpriteRun starts and shows frame 1 until a key plays its group.
 2. Hold a key that has a group. That group loops, from its first frame, for as long as you hold it.
 3. Release the key. The On Release rule applies at once.
-4. Press F5 again to stop.
+4. Press Esc to stop and go back to the start state.
 
 Frame Group Control rules are checked first, from the top. If no rule matches and several keys are held, the most recently pressed key's group plays. When you let it go, the most recent key still held takes over. Keys with no group do nothing. Pressing a key that has a group while RunSpriteRun is stopped starts it. Keys work only while RunSpriteRun is running and no text box has focus. Changing the frame order, labels or groups while running stops it.
 
-The **key pad** at the left of the timeline lights up the keys you are holding, in each group's colour (light blue if the group has no colour).
+The **key pad** at the left of the timeline lights up the keys you are holding, in each group's colour (muted green if the group has no colour). Under the 1 to 6 buttons an amber row, ACTION ANIMATIONS, shows keys 7, 8, 9 and 0 (see Action animations under Frame Group Control).
 
 ### Timing
 
@@ -410,6 +416,10 @@ Merges colours so the project uses fewer of them, for example to fit a tighter c
 
 The program joins the colours that are closest to each other, and the more heavily used colour survives. Every pixel of a removed colour becomes the nearest kept colour, in every frame. Reduce Palette is unavailable on the Commodore 64 and Apple II Double Hi-Res, whose palettes are fixed.
 
+### Shorten Frame Names
+
+Makes long frame names short. Frames from a sprite sheet are named after the sheet's file name, for example RickDangerous_SpriteSheet_Amiga_24x21_8x4_001. Choose Edit > Shorten Frame Names, type the text you want in place of the part every frame name starts with (for example Rick), and the frames become Rick_001, Rick_002 and so on. The new text cannot be empty and may use letters, numbers, - and _. A before and after example is shown, and the program asks you to confirm. It cannot be undone, so do not save if you want to keep the original names. When you import a sprite sheet, the Start Project box also has a Frame name box, filled with the file name, that you can shorten before you create the project.
+
 ### Group menu
 
 **Group > New Group** (Ctrl+G) starts a new group in the Set Frame Group panel. **Group > Delete Group** removes the group shown after you confirm. Group > Frame Group Control opens the Frame Group Control window (the same as the Set Rules button). The Group menu is greyed out in Edit mode.
@@ -454,7 +464,7 @@ Use **File > Open Project** (Ctrl+O), or the Open Project button in the Start Pr
 
 Three folders are written: **Sprite_Sheet** (all frames), **Frame_Sprite_Sheets** (one per group) and **Sprites** (every frame as a PNG). If files already exist, the program lists them and asks whether to replace them. Frame files are named ProjectName_GroupName_FrameLabel.png, or NoGroup for a frame in no group.
 
-Export also writes ProjectName_Rules.txt and ProjectName_Rules.json into the project's export folder, next to the three folders. The text file is tab-separated, so it opens in a spreadsheet: a table of the rules (priority, keys, only after, the group each plays, loop or play once, and what happens on release) and a table of the groups (first and last frame, key, sprite sheet). The JSON file holds the same information for game developers, with the controller, the frames and file names of every group, and a short note on how to read the rules. Nothing in RunSpriteRun reads these files back. Save writes them into the project folder too, and File > Export Rules saves either file wherever you choose.
+Export also writes ProjectName_Rules.txt and ProjectName_Rules.json into the project's export folder, next to the three folders. The text file is tab-separated, so it opens in a spreadsheet: a table of the rules (priority, keys, only if in, the group each plays, loop or play once, and what happens on release) a table of the transitions, and a table of the groups (first and last frame, key, sprite sheet). The JSON file holds the same information for game developers, with the controller, the frames and file names of every group, and a short note on how to read the rules. Nothing in RunSpriteRun reads these files back. Save writes them into the project folder too, and File > Export Rules saves either file wherever you choose.
 
 ### Image rules
 
@@ -490,8 +500,8 @@ Saved and exported sheets use the same layout as a blank sheet, so a sheet can b
 | Ctrl+Z / Ctrl+Y | Undo / Redo | Anywhere (in Edit mode they step through your edits) |
 | Ctrl+G | New group | Anywhere |
 | F1 | Help | Anywhere |
-| F5 | Start / stop RunSpriteRun | Normal mode |
-| W A S D, 1 to 6 | Play the group assigned to the key | While RunSpriteRun is running |
+| Esc | Stop RunSpriteRun (while it is running) | Normal mode |
+| W A S D, 1 to 6, 7 8 9 0 | Play the group assigned to the key | While RunSpriteRun is running |
 | Ctrl+C / Ctrl+V | Copy / paste frames | Timeline has the focus |
 | Ctrl+Left / Ctrl+Right | Move the selected frame one place | Timeline has the focus |
 | Ctrl+click / Shift+click | Add to / select a range of frames | Timeline |
@@ -532,7 +542,7 @@ Ten ready-made projects are installed in the **Examples\Projects** folder, one f
 
 **My sprite sheet is refused.** Check that the box lines are in the Box colour you chose, that every box is the same size (4 to 128 pixels), that the Box colour and Transparent colour differ, and that the sheet has no see-through pixels.
 
-**Keys do nothing in RunSpriteRun.** Press F5 first, make sure the key has a group, or is used by a rule in Frame Group Control, and click away from any text box.
+**Keys do nothing in RunSpriteRun.** Make sure the key has a group, or is used by a rule in Frame Group Control, and click away from any text box.
 
 A Frame Group Control rule never plays. Rules are checked from the top, so a rule higher up that needs fewer keys (such as D) can win before a rule that needs more (such as W+D+1). Use the arrows to move the more specific rule up.
 

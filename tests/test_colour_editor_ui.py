@@ -213,15 +213,13 @@ def test_step_buttons_move_slider_one_level(win):
     assert e.sliders[2].value() == 7 and e.hex.text() == "#{:02X}{:02X}{:02X}".format(*e.colour)
 
 
-def test_play_and_f5_buttons_light_up(win):
+def test_play_button_lights_up(win):
     gp = win.panels["Frame Group Preview"]
     assert not gp.play_btn.isChecked()
     gp.play()
     assert gp.play_btn.isChecked()
     gp.stop()
     assert not gp.play_btn.isChecked()
-    win.toggle_run()
-    assert win.panels["RunSpriteRun window"].f5_btn.isChecked()
 
 
 def test_plus_colour_returns_to_pencil_with_the_new_colour(win, log):

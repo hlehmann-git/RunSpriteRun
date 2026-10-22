@@ -43,7 +43,7 @@ def win(app, log):
             stray.hide()
     w = MainWindow()
     w.show()
-    w.set_project(make(rules=[ControlRule(["D", "A"], "TurnLeft", once=True)]))
+    w.set_project(make(rules=[ControlRule(["W", "D"], "TurnLeft", once=True)]))
     return w
 
 
@@ -66,7 +66,7 @@ def test_the_panel_summary_shows_what_plays_the_group(win):
     win.set_frame_group.current = "TurnLeft"
     win.set_frame_group.blank = False
     win.set_frame_group.refresh()
-    assert "A+D" in win.set_frame_group.rules_text.text() and "once" in win.set_frame_group.rules_text.text()
+    assert "W+D" in win.set_frame_group.rules_text.text() and "once" in win.set_frame_group.rules_text.text()
     win.set_frame_group.current = "WalkRight"
     win.set_frame_group.refresh()
     text = win.set_frame_group.rules_text.text()
@@ -92,7 +92,7 @@ def test_apply_keeps_the_groups_key_and_release(win):
 def test_changing_a_rule_is_one_undo_step(win):
     win.show_control_window()
     c = win.controller
-    c.set_control_rules([ControlRule(["D", "A"], "TurnLeft", once=False)])
+    c.set_control_rules([ControlRule(["W", "D"], "TurnLeft", once=False)])
     assert c.project.control_rules[0].once is False
     c.undo()
     assert c.project.control_rules[0].once is True
@@ -172,7 +172,7 @@ def test_export_rules_menu_writes_text_or_json(win, tmp_path, monkeypatch):
     assert out_txt.read_text().splitlines()[2].startswith("Priority\tSource")
     monkeypatch.setattr(QFileDialog, "getSaveFileName", staticmethod(lambda *a, **k: (str(out_json), "")))
     win.export_rules()
-    assert json.loads(out_json.read_text())["rules"][0]["keys"] == ["A", "D"]
+    assert json.loads(out_json.read_text())["rules"][0]["keys"] == ["W", "D"]
     assert win.act_export_rules.isEnabled() and win.act_control.isEnabled()
 
 
@@ -180,3 +180,33 @@ def test_deleting_a_group_removes_its_rule_and_the_window_follows(win):
     win.show_control_window()
     affected = win.controller.delete_group("TurnLeft")
     assert affected and win.controller.project.control_rules == []
+
+
+def test_apply_esc_and_the_x_all_close_the_window(win):
+    from PySide6.QtCore import Qt
+    from PySide6.QtGui import QCloseEvent
+    from PySide6.QtTest import QTest
+    win.set_frame_group.rules_btn.click()
+    cw = win.control_window
+    assert cw.isVisible() and cw.apply_btn.text() == "Apply"
+    QTest.keyClick(cw, Qt.Key_Escape)
+    assert not cw.isVisible()                               # Esc closes it
+    win.set_frame_group.rules_btn.click()
+    assert cw.isVisible()
+    ev = QCloseEvent()
+    cw.closeEvent(ev)
+    cw.hide()
+    assert ev.isAccepted()                                  # the X closes it
+    win.set_frame_group.rules_btn.click()
+    cw.apply_btn.click()
+    assert not cw.isVisible()                               # Apply closes it
+    win.set_frame_group.rules_btn.click()                   # it can be opened again
+    assert cw.isVisible()
+
+
+def test_closing_the_main_window_closes_the_control_window(win):
+    win.set_frame_group.rules_btn.click()
+    assert win.control_window.isVisible()
+    win.controller.project.dirty = False
+    win.close()
+    assert not win.control_window.isVisible()

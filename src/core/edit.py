@@ -2,6 +2,7 @@
 Pure logic with no UI. Anything that needs the owner's confirmation is passed in as a function."""
 from __future__ import annotations
 
+import os
 from collections import Counter
 from dataclasses import dataclass, field
 from typing import Callable
@@ -100,8 +101,12 @@ def _drop_control_rules(project: Project, gone_groups: set[str], reset: list[str
     from .rules import keys_text
     keep = []
     for cr in project.control_rules:
-        if cr.group in gone_groups or (cr.from_group and cr.from_group in gone_groups):
+        if cr.group in gone_groups:
             continue
+        if cr.only_in:
+            cr.only_in = [x for x in cr.only_in if x not in gone_groups]
+            if not cr.only_in:                      # every group the condition named is gone: the rule goes (it must not become "always")
+                continue
         r = cr.release
         if r is not None and ((r.kind == "group" and r.target in gone_groups) or (r.kind == "frame" and r.target in gone_labels)):
             cr.release = None
@@ -109,6 +114,16 @@ def _drop_control_rules(project: Project, gone_groups: set[str], reset: list[str
                 reset.append(f"rule {keys_text(cr.keys)} (When released)")
         keep.append(cr)
     project.control_rules = keep
+    tkeep = []
+    for t in project.transitions:
+        if t.to in gone_groups or t.play in gone_groups:
+            continue
+        if t.from_groups:
+            t.from_groups = [x for x in t.from_groups if x not in gone_groups]
+            if not t.from_groups:                   # it named groups, all gone: it must not become "from any group"
+                continue
+        tkeep.append(t)
+    project.transitions = tkeep
 
 
 def delete_group(project: Project, name: str) -> list[str]:
@@ -309,10 +324,13 @@ def plan_delete(project: Project, indices) -> DeletePlan:
         if g.name not in plan.emptied and points_away(g.on_release):
             plan.resets.append(f"group {g.name} (On Release)")
     for cr in project.control_rules:
-        if cr.group in plan.emptied or (cr.from_group and cr.from_group in plan.emptied):
+        if cr.group in plan.emptied or (cr.only_in and all(x in plan.emptied for x in cr.only_in)):
             plan.resets.append(f"rule {_kt(cr.keys)} (Frame Group Control)")
         elif points_away(cr.release):
             plan.resets.append(f"rule {_kt(cr.keys)} (When released)")
+    for t in project.transitions:
+        if t.to in plan.emptied or t.play in plan.emptied or (t.from_groups and all(x in plan.emptied for x in t.from_groups)):
+            plan.resets.append(f"transition {', '.join(t.from_groups) or 'Any'} to {t.to}")
     if points_away(project.start_state):
         plan.resets.append("Start state")
     return plan
@@ -348,3 +366,40 @@ def delete_frames(project: Project, indices) -> DeletePlan:
     renumber(project)
     project.dirty = True
     return plan
+
+
+MSG_NO_SHARED_TEXT = "The frame names have no text in common at the start, so there is nothing to shorten."
+
+
+def shared_prefix(project: Project) -> str:
+    """The text every frame name starts with. When the names are not all the same it stops at the last _ or - they
+    share, so only whole parts are shared ("Rick_walk" and "Rick_jump" share "Rick"). Empty if nothing is shared."""
+    names = [name_of(f.label) for f in project.frames]
+    if not names:
+        return ""
+    prefix = os.path.commonprefix(names)
+    if all(n == prefix for n in names):
+        return prefix
+    cut = max(prefix.rfind("_"), prefix.rfind("-"))
+    return prefix[:cut] if cut > 0 else ""
+
+
+def shortened_names(project: Project, replacement: str) -> list[str]:
+    """The frame names with the shared start swapped for the replacement. Raises EditError if it cannot be done."""
+    if not replacement:
+        raise EditError(MSG_NAME_EMPTY)
+    if not valid_frame_name(replacement):
+        raise EditError(MSG_LABEL_CHARS)
+    prefix = shared_prefix(project)
+    if not prefix:
+        raise EditError(MSG_NO_SHARED_TEXT)
+    names = [replacement + name_of(f.label)[len(prefix):] for f in project.frames]
+    if any(not valid_frame_name(n) for n in names):
+        raise EditError(MSG_LABEL_CHARS)
+    return names
+
+
+def shorten_names(project: Project, replacement: str) -> bool:
+    """Edit > Shorten Frame Names: swap the text every frame name starts with for the replacement. The numbers stay.
+    Rules that pointed at a renamed label follow it. It cannot be undone."""
+    return _apply_names(project, shortened_names(project, replacement))

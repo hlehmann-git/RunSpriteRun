@@ -20,7 +20,7 @@ class Controller(QObject):
     frames_changed = Signal()         # frame order, labels or groups changed
     playing_frame = Signal(int)       # frame being shown by a playing view, or -1 when none is playing
     run_frame = Signal(int)           # frame the RunSpriteRun window shows (always: the start state when stopped)
-    run_state = Signal(bool)          # F5: RunSpriteRun started or stopped
+    run_state = Signal(bool)          # RunSpriteRun started or stopped
     keys_held = Signal(list)          # assigned keys now held, for the Keys panel
     settings_changed = Signal()       # Settings were changed (OK in the Settings dialog)
     history_changed = Signal()        # undo / redo became available or unavailable
@@ -276,6 +276,19 @@ class Controller(QObject):
         self.frames_changed.emit()
         return True
 
+    def set_transitions(self, transitions) -> bool:
+        """Replace the Frame Group Control transition list (one Undo step). Shows the message and does nothing if one is not valid."""
+        assert self.project is not None
+        try:
+            before = self.checkpoint()
+            groups.set_transitions(self.project, transitions)
+        except groups.GroupError as e:
+            messages.warn(self.parent_widget, str(e))
+            return False
+        self.commit(before)
+        self.frames_changed.emit()
+        return True
+
     def set_group_key(self, name: str, key) -> bool:
         """The basic key of a group, edited in the Frame Group Control window. A key another group uses is moved after asking."""
         assert self.project is not None
@@ -485,7 +498,7 @@ class Controller(QObject):
         return self.runner is not None and self.runner.running
 
     def toggle_run(self) -> None:
-        """F5: start RunSpriteRun, or stop it and return to the start state."""
+        """Start RunSpriteRun, or stop it and return to the start state."""
         if self.runner is None or self.edit.mode:
             return
         if self.running:
@@ -506,7 +519,7 @@ class Controller(QObject):
         self._show_run()
 
     def start_with_key(self, key: str) -> bool:
-        """RunSpriteRun is stopped and a key that has a Frame Group is pressed: start it (as F5 does) and
+        """RunSpriteRun is stopped and a key that has a Frame Group is pressed: start it and
         play that group. Keys with no group do nothing."""
         if self.runner is None or self.running or self.edit.mode or not self.runner._matters(key):
             return False
@@ -528,7 +541,7 @@ class Controller(QObject):
         return False
 
     def release_all_keys(self) -> None:
-        if self.runner is not None and self.runner.held:
+        if self.runner is not None and self.runner._physical:
             self.runner.release_all()
             self.keys_held.emit([])
             self._show_run()

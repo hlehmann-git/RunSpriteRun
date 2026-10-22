@@ -40,13 +40,12 @@ def key(win, qt_key, down=True, auto=False, mods=Qt.NoModifier):
     QApplication.sendEvent(win, ev)
 
 
-def test_f5_toggles_and_the_idle_window_shows_the_start_state(win):
+def test_esc_stops_and_the_idle_window_shows_the_start_state(win):
     c = win.controller
-    run = win.panels["RunSpriteRun window"]
     assert not c.running and c.runner.frame == 0
-    win.f5.activated.emit()
+    win.toggle_run()
     assert c.running and c.timer.isActive()
-    win.f5.activated.emit()
+    key(win, Qt.Key_Escape)                                   # Esc stops RunSpriteRun
     assert not c.running and not c.timer.isActive()
 
 
@@ -67,17 +66,17 @@ def test_key_with_a_group_starts_running_then_loops_and_highlights(win):
     assert pad.held == set() and c.runner.frame == 9 and c.running   # resting state: Go To Frame f10; still running
 
 
-def test_f5_or_the_button_stops_a_key_started_run(win):
+def test_esc_stops_a_key_started_run(win):
     c = win.controller
     key(win, Qt.Key_W)
     assert c.running
-    win.f5.activated.emit()
+    key(win, Qt.Key_Escape)
     assert not c.running and not c.timer.isActive() and c.runner.held == []
     key(win, Qt.Key_W, down=False)                            # releasing afterwards does nothing
     assert not c.running
     key(win, Qt.Key_D)
     assert c.running
-    win.panels["RunSpriteRun window"].f5_btn.click()
+    key(win, Qt.Key_Escape)
     assert not c.running
 
 
@@ -161,17 +160,9 @@ def test_rendering_at_zoom_is_whole_number_and_centred():
     assert out.getpixel((21, 16)) == (200, 0, 0) and out.getpixel((22, 16)) == (0, 0, 0)
 
 
-def test_f5_toggle_button_does_what_f5_does(win):
-    run = win.panels["RunSpriteRun window"]
-    c = win.controller
-    assert not c.running and not run.f5_btn.isChecked()
-    run.f5_btn.click()
-    assert c.running and run.f5_btn.isChecked()
-    win.f5.activated.emit()                                    # the real F5 keeps the button in step
-    assert not c.running and not run.f5_btn.isChecked()
-    run.f5_btn.click()
-    run.f5_btn.click()
-    assert not c.running and not run.f5_btn.isChecked()
+def test_there_is_no_f5_shortcut_or_button(win):
+    assert not hasattr(win, "f5")
+    assert not hasattr(win.panels["RunSpriteRun window"], "f5_btn")
 
 
 def test_idle_window_follows_selection_and_running_does_not(win):

@@ -3,8 +3,8 @@ Pure logic with no UI. Frame numbers inside this module are 0-based; messages us
 from __future__ import annotations
 
 from .colour import Colour
-from .project import ControlRule, Group, Project, Rule
-from .rules import KEYS, MAX_GROUPS, keys_text, valid_group_name
+from .project import ControlRule, Group, Project, Rule, Transition
+from .rules import ACTION_KEYS, KEYS, MAX_GROUPS, has_opposites, keys_text, valid_group_name
 
 MSG_NAME_CHARS = "Group names can only use letters, numbers, - and _ (no spaces)."
 MSG_NAME_DUPLICATE = "A group with that name already exists."
@@ -95,8 +95,13 @@ def save_group(project: Project, editing: str | None, name: str, first: int, las
             for cr in project.control_rules:
                 if cr.group == editing:
                     cr.group = name
-                if cr.from_group == editing:
-                    cr.from_group = name
+                cr.only_in = [name if x == editing else x for x in cr.only_in]
+            for t in project.transitions:
+                t.from_groups = [name if x == editing else x for x in t.from_groups]
+                if t.to == editing:
+                    t.to = name
+                if t.play == editing:
+                    t.play = name
         group.name, group.first, group.last = name, first, last
         group.key, group.on_release, group.colour = key, on_release, colour
         if on_release is not None and on_release.kind == "group" and on_release.target == editing:
@@ -128,8 +133,10 @@ def rules_pointing_to(project: Project, name: str) -> list[str]:
            if g.name != name                       # the deleted group's own rule goes with it
            and g.on_release is not None and g.on_release.kind == "group" and g.on_release.target == name]
     out += [f"rule {keys_text(cr.keys)} (Frame Group Control)" for cr in project.control_rules if cr.group == name]
-    out += [f"rule {keys_text(cr.keys)} (Only after)" for cr in project.control_rules
-            if cr.group != name and cr.from_group == name]
+    out += [f"rule {keys_text(cr.keys)} (Only if in)" for cr in project.control_rules
+            if cr.group != name and name in cr.only_in]
+    out += [f"transition {', '.join(t.from_groups) or 'Any'} to {t.to}" for t in project.transitions
+            if name in (t.to, t.play) or name in t.from_groups]
     out += [f"rule {keys_text(cr.keys)} (When released)" for cr in project.control_rules
             if cr.group != name and cr.release is not None and cr.release.kind == "group" and cr.release.target == name]
     if project.start_state is not None and project.start_state.kind == "group" and project.start_state.target == name:
@@ -140,17 +147,42 @@ def rules_pointing_to(project: Project, name: str) -> list[str]:
 # ---- Frame Group Control rules (the keys that play a group) ----------------------------------------------------
 MSG_RULE_NO_KEYS = "A rule needs at least one key."
 MSG_RULE_NO_GROUP = "Choose a group for the rule."
+MSG_RULE_ACTION_ALONE = "An action key (7, 8, 9, 0) cannot be combined with any other key."
+MSG_RULE_OPPOSITE = "A joystick cannot press opposite directions (W and S, or A and D) together."
+MSG_TRANSITION_GROUPS = "Choose the group to go to and the group to play first."
+MSG_TRANSITION_SAME = "The group that plays first must be a different group from the one it goes to."
+
+
+def check_transition(project: Project, t: Transition) -> None:
+    """Raise GroupError if the transition cannot be kept."""
+    if find_group(project, t.to) is None or find_group(project, t.play) is None:
+        raise GroupError(MSG_TRANSITION_GROUPS)
+    if t.play == t.to:
+        raise GroupError(MSG_TRANSITION_SAME)
+    if any(find_group(project, x) is None for x in t.from_groups):
+        raise GroupError(MSG_TRANSITION_GROUPS)
+
+
+def set_transitions(project: Project, transitions: list[Transition]) -> None:
+    for t in transitions:
+        check_transition(project, t)
+    project.transitions = list(transitions)
+    project.dirty = True
 
 
 def check_control_rule(project: Project, rule: ControlRule) -> None:
     """Raise GroupError if the rule cannot be kept."""
     if not rule.keys:
         raise GroupError(MSG_RULE_NO_KEYS)
-    if any(k not in ("W", "A", "S", "D", "1", "2", "3", "4", "5", "6") for k in rule.keys) or len(set(rule.keys)) != len(rule.keys):
+    if any(k not in ("W", "A", "S", "D", "1", "2", "3", "4", "5", "6") + ACTION_KEYS for k in rule.keys) or len(set(rule.keys)) != len(rule.keys):
         raise GroupError("Unknown key.")
+    if any(k in ACTION_KEYS for k in rule.keys) and len(rule.keys) > 1:
+        raise GroupError(MSG_RULE_ACTION_ALONE)
+    if has_opposites(rule.keys):
+        raise GroupError(MSG_RULE_OPPOSITE)
     if find_group(project, rule.group) is None:
         raise GroupError(MSG_RULE_NO_GROUP)
-    if rule.from_group and find_group(project, rule.from_group) is None:
+    if any(find_group(project, x) is None for x in rule.only_in):
         raise GroupError(MSG_RULE_NO_GROUP)
 
 
