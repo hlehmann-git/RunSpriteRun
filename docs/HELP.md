@@ -23,7 +23,7 @@ Anyone who makes or tests pixel-art sprites: retro game developers, pixel artist
 
 RunSpriteRun runs on Windows 10 and 11 (64-bit). It works fully offline: it never connects to the internet and sends nothing anywhere.
 
-1. Go to the project's Releases page on GitHub and download **RunSpriteRun_Setup_v2.0.9.exe** (or the newest version listed).
+1. Go to the project's Releases page on GitHub and download the newest **RunSpriteRun_Setup** .exe file listed there.
 2. Double-click the file and follow the Setup wizard. No other software, such as Python, is needed.
 3. Start RunSpriteRun from the Start menu.
 

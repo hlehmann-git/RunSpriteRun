@@ -220,7 +220,7 @@ def test_help_and_about_text(win):
     help_text = HelpDialog(win).text.toPlainText()
     assert "Frame Group Control" in help_text and "Lorem ipsum" not in help_text
     a = AboutDialog(win)
-    assert a.author.text() == "by Harley Lehmann" and a.version.text() == "Version 2.0.14"
+    assert a.author.text() == "by Harley Lehmann" and a.version.text() == "Version 2.0.15"
     assert "5649" in a.comments.text() and not a.picture.pixmap().isNull()
     assert a.picture.pixmap().width() == 480
     assert "Deluxe Paint" in a.description.text() and "Buddy Claude" in a.small_print.text()
