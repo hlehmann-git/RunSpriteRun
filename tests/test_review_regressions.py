@@ -170,7 +170,6 @@ def test_action_default_release_holds_its_last_frame() -> None:
     assert r.frame == 2
 
 
-@pytest.mark.xfail(strict=True, reason="F05: failed rules export is reported as a successful save")
 def test_save_reports_required_rules_file_failure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     p = project()
 
@@ -279,3 +278,38 @@ def test_rules_text_cells_are_never_formulas() -> None:
         for cell in line.split("\t"):
             assert not cell.startswith(("=", "+", "-", "@"))
     assert "'-Walk" in text
+
+
+def test_failed_rules_file_stops_save_before_any_image(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    p = project()
+
+    def denied(*args: object, **kwargs: object) -> None:
+        raise PermissionError("simulated: rules destination is read-only")
+
+    monkeypatch.setattr(rules_export, "write_rules_files", denied)
+    folder = tmp_path / "Review"
+    with pytest.raises(OSError):
+        save_whole(p, folder / "Review.rsr")
+    assert not any(f.suffix == ".png" for f in folder.rglob("*"))
+    assert not (folder / "Review.rsr").exists()
+
+
+def test_failed_save_keeps_the_imported_sprite_sheet(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from src.io import save as save_module
+    sheet = tmp_path / "sheet.png"
+    Image.new("RGB", (8, 8), T).save(sheet)
+    p = project()
+    p.source_sheet = str(sheet)
+
+    def broken(*args: object, **kwargs: object) -> None:
+        raise OSError("simulated: disk full")
+
+    monkeypatch.setattr(save_module, "save_project", broken)
+    with pytest.raises(OSError):
+        save_whole(p, tmp_path / "Review" / "Review.rsr")
+    assert p.source_sheet == str(sheet)
+    monkeypatch.undo()
+    target = tmp_path / "Again"
+    save_whole(p, target / "Again.rsr")
+    assert (target / "sheet.png").is_file()
+    assert p.source_sheet is None

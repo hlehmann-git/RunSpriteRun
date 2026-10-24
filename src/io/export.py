@@ -56,7 +56,9 @@ def write_all(project: Project, folder: Path, fill: Colour, with_data: bool) -> 
     folder = Path(folder)
     for name in FOLDERS:
         (folder / name).mkdir(parents=True, exist_ok=True)
-    written: list[str] = []
+    from src.io import rules_export
+    rules_export.write_rules_files(project, folder)         # <Project>_Rules.txt and .json (not in `written`); written first,
+    written: list[str] = []                                 # so a failure (OSError) stops the Save or Export before any image
 
     def put_sheet(rel_folder: str, file_name: str, indices: list[int]) -> None:
         sheet = sheets.build_sheet(project, indices, fill)
@@ -75,11 +77,6 @@ def write_all(project: Project, folder: Path, fill: Colour, with_data: bool) -> 
         name = sheets.frame_file_name(project, i)
         frame.image.save(safe_path(folder, FOLDER_SPRITES, name), format="PNG")
         written.append(f"{FOLDER_SPRITES}/{name}")
-    from src.io import rules_export
-    try:
-        rules_export.write_rules_files(project, folder)     # <Project>_Rules.txt and .json in the project folder (not in `written`)
-    except OSError:
-        pass                                                # a rules file that cannot be written never stops a Save or an Export
     return written
 
 

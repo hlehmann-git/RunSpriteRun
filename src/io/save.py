@@ -19,18 +19,20 @@ def save_whole(project: Project, rsr_path: str | Path) -> None:
                       f"{project.system.max_colours}. Delete or merge colours first.")
     folder = Path(rsr_path).parent
     old = list(project.written_files)
-    if project.source_sheet:                       # the imported sheet is kept in the project folder (FR-1.5)
-        src = Path(project.source_sheet)
+    sheet = project.source_sheet
+    if sheet:                                      # the imported sheet is kept in the project folder (FR-1.5)
+        src = Path(sheet)
         dest = folder / src.name
         if src.is_file() and not dest.exists():
             folder.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, dest)
-        project.source_sheet = None
-    written = export.write_all(project, folder, project.transparent, with_data=True)
-    project.written_files = written
     try:
+        written = export.write_all(project, folder, project.transparent, with_data=True)
+        project.written_files = written
+        project.source_sheet = None                # saved without it; it is put back if this Save fails
         save_project(project, rsr_path)
     except BaseException:
         project.written_files = old
+        project.source_sheet = sheet               # a later Save still has the imported sheet to copy
         raise
     export.remove_stale(folder, old, written, project.name)
