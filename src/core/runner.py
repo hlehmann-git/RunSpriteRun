@@ -208,7 +208,12 @@ class Runner:
             if g is None:
                 self._hold(self.frame)
                 return
-            self._apply(r.release if r.release is not None else g.on_release, g.last)
+            if r.release is not None:
+                self._apply(r.release, g.last)
+            elif any(k in ACTION_KEYS for k in r.keys):
+                self._hold(g.last)                         # an action key's default is "Stay on last frame", not the group's own choice
+            else:
+                self._apply(g.on_release, g.last)
         else:
             g = self._group_for_key(token[1])
             if g is not None:

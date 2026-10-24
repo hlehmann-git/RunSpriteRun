@@ -289,14 +289,24 @@ class Controller(QObject):
         self.frames_changed.emit()
         return True
 
-    def set_rules_and_transitions(self, rules, transitions) -> bool:
-        """Replace the Frame Group Control rules and transitions together: one Undo step (the Apply of the Frame Group Control window)."""
+    def set_rules_and_transitions(self, rules, transitions, group_keys: dict | None = None) -> bool:
+        """Replace the Frame Group Control rules and transitions together, and the Group keys changes made in that window
+        (`group_keys`: group name -> [key, on_release]): one Undo step (the Apply of the Frame Group Control window)."""
         assert self.project is not None
+        before = self.checkpoint()
         try:
-            before = self.checkpoint()
             groups.set_control_rules(self.project, rules)
             groups.set_transitions(self.project, transitions)
+            if group_keys:
+                for name in group_keys:                          # clear first, so keys can swap between groups
+                    if groups.find_group(self.project, name) is not None:
+                        groups.set_group_key(self.project, name, None)
+                for name, (key, release) in group_keys.items():
+                    if groups.find_group(self.project, name) is not None:
+                        groups.set_group_key(self.project, name, key)
+                        groups.set_group_release(self.project, name, release)
         except groups.GroupError as e:
+            history.restore(self.project, before)                # nothing is changed partly
             messages.warn(self.parent_widget, str(e))
             return False
         self.commit(before)

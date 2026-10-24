@@ -107,7 +107,6 @@ def test_colour_in_edit_undo_history_cannot_be_deleted(app: QApplication) -> Non
     e.finish(False)
 
 
-@pytest.mark.xfail(strict=True, reason="F02: enlarged sheet imports pad with the first sprite pixel")
 def test_enlarged_sheet_uses_chosen_transparent_padding(app: QApplication, tmp_path: Path) -> None:
     system = get_system("Atari ST")
     sheet = blank_sheet.build(system, 8, 8, 1, 1, box=GREEN, fill=T)
@@ -130,7 +129,6 @@ def test_enlarged_sheet_uses_chosen_transparent_padding(app: QApplication, tmp_p
         d.deleteLater()
 
 
-@pytest.mark.xfail(strict=True, reason="F03: Group keys changes bypass the parent window's Cancel")
 def test_cancel_control_window_discards_group_key_changes(app: QApplication) -> None:
     p = project()
     p.groups = [Group("Idle", 0, 2, key="A")]
@@ -152,7 +150,6 @@ def test_cancel_control_window_discards_group_key_changes(app: QApplication) -> 
         window.deleteLater()
 
 
-@pytest.mark.xfail(strict=True, reason="F04: action's 'Stay on last frame' follows the group's default release")
 def test_action_default_release_holds_its_last_frame() -> None:
     p = project()
     p.groups = [
@@ -181,7 +178,6 @@ def test_save_reports_required_rules_file_failure(tmp_path: Path, monkeypatch: p
         save_whole(p, tmp_path / "Review.rsr")
 
 
-@pytest.mark.xfail(strict=True, reason="F06: Run key routing consumes S before Select tool routing")
 def test_s_select_shortcut_through_actual_event_filter(app: QApplication, monkeypatch: pytest.MonkeyPatch) -> None:
     window = MainWindow(settings=Settings())
     window.set_project(project())
@@ -313,3 +309,37 @@ def test_failed_save_keeps_the_imported_sprite_sheet(tmp_path: Path, monkeypatch
     save_whole(p, target / "Again.rsr")
     assert (target / "sheet.png").is_file()
     assert p.source_sheet is None
+
+
+def test_apply_control_window_keeps_group_key_changes_as_one_undo_step(app: QApplication) -> None:
+    p = project()
+    p.groups = [Group("Idle", 0, 1, key="A"), Group("Walk", 2, 2, key="D")]
+    c = Controller(settings=Settings())
+    c.set_project(p)
+    window = ControlWindow(None, c)
+    window.load()
+    keys = GroupKeysDialog(window, c, window.d_keys)
+    try:
+        combo = keys._key_boxes["Idle"]
+        combo.setCurrentIndex(combo.findData("D"))         # takes D from Walk (the move is confirmed)
+        keys.accept()
+        assert p.groups[0].key == "A"                       # nothing changes before Apply
+        window._apply()
+        assert [g.key for g in p.groups] == ["D", None]
+        assert c.undo()
+        assert [g.key for g in p.groups] == ["A", "D"]
+    finally:
+        keys.deleteLater()
+        window.deleteLater()
+
+
+def test_normal_rule_still_uses_group_default_release() -> None:
+    p = project()
+    p.groups = [Group("Idle", 0, 0), Group("Walk", 1, 2, on_release=Rule("frame", "Frame_001"))]
+    p.control_rules = [ControlRule(["D"], "Walk")]
+    r = Runner(p)
+    r.start()
+    assert r.press("D")
+    r.tick()
+    assert r.release("D")
+    assert r.frame == 0

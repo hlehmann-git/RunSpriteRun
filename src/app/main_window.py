@@ -239,7 +239,8 @@ class MainWindow(QMainWindow):
 
     def eventFilter(self, obj, event) -> bool:
         t = event.type()
-        if t in (QEvent.KeyPress, QEvent.KeyRelease) and event.key() in RUN_KEYS and not self.controller.add_mode:
+        if (t in (QEvent.KeyPress, QEvent.KeyRelease) and event.key() in RUN_KEYS and not self.controller.add_mode
+                and not self.controller.edit.mode):              # in Edit mode S is the Select tool, not a RunSpriteRun key
             if event.modifiers() & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier):
                 return False
             key = RUN_KEYS[event.key()]

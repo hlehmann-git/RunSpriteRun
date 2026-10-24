@@ -507,10 +507,10 @@ class StartProjectDialog(QDialog):
         return canvas if canvas != native and canvas[0] >= native[0] and canvas[1] >= native[1] else None
 
     @staticmethod
-    def _centre_on_canvas(result: ImportResult, canvas: tuple[int, int]) -> None:
-        """Put every frame in the middle of a bigger canvas, filled with the transparent colour. An odd leftover
-        pixel goes to the right and the bottom."""
-        fill = result.transparent_default
+    def _centre_on_canvas(result: ImportResult, canvas: tuple[int, int], fill=None) -> None:
+        """Put every frame in the middle of a bigger canvas, filled with the transparent colour (`fill`, or the
+        import's own transparent colour when not given). An odd leftover pixel goes to the right and the bottom."""
+        fill = result.transparent_default if fill is None else tuple(fill)
         for f in result.frames:
             big = Image.new("RGB", canvas, fill)
             big.paste(f.image, ((canvas[0] - f.image.width) // 2, (canvas[1] - f.image.height) // 2))
@@ -544,12 +544,13 @@ class StartProjectDialog(QDialog):
             messages.adjusted(self, [f"Colours in this sprite sheet were adjusted to the nearest colour valid for "
                                      f"{system.name}."], "")
         size = (g.width, g.height)
+        transparent = system.snap(self.fill_colour.colour)           # the transparent colour chosen for this sheet
         canvas = self._larger_canvas(size)
         if canvas:
-            self._centre_on_canvas(result, canvas)
+            self._centre_on_canvas(result, canvas, transparent)
             size = canvas
         self.project = create_project(self.name.text(), system, size[0], size[1], result, self.fps.currentData())
-        self.project.transparent = system.snap(self.fill_colour.colour)
+        self.project.transparent = transparent
         self.project.source_sheet = str(self._sheet_path)
         self.accept()
 

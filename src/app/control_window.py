@@ -272,39 +272,71 @@ def groups_text(names: list[str], empty: str) -> str:
 
 class GroupKeysDialog(QDialog):
     """Older projects can have a group with a key of its own (the group plays while that key is held, after the rules). Those
-    keys and their On Release choices are edited here, one by one; each change is applied at once and is one Undo step."""
+    keys and their On Release choices are edited here. The changes go into the Frame Group Control window's copy (`draft`:
+    group name -> [key, on_release]) and count only when that window's Apply is pressed; its Cancel drops them."""
 
-    def __init__(self, parent: QWidget, controller: Controller) -> None:
+    def __init__(self, parent: QWidget, controller: Controller, draft: dict | None = None) -> None:
         super().__init__(parent)
         self.controller = controller
         self.setWindowTitle("Group keys")
         lay = QVBoxLayout(self)
-        note = QLabel("A group with a key of its own plays while that key is held, after the rules in Frame Group Control.")
+        note = QLabel("A group with a key of its own plays while that key is held, after the rules in Frame Group Control. "
+                      "Changes here are kept when you press Apply in Frame Group Control.")
         note.setWordWrap(True)
         note.setStyleSheet(GREY)
         lay.addWidget(note)
         p = controller.project
+        if draft is None:
+            draft = getattr(parent, "d_keys", None)
+            if draft is None:
+                draft = {g.name: [g.key, copy.deepcopy(g.on_release)] for g in p.groups if g.key}
+        self.draft = draft
         self._rc: dict[str, ReleaseChoice] = {}
-        for g in sorted((g for g in p.groups if g.key), key=lambda g: 0 if g.key in DIAGONALS else 1):
+        self._key_boxes: dict[str, QComboBox] = {}
+        by_name = {g.name: g for g in p.groups}
+        names = [n for n in draft if n in by_name]
+        for name in sorted(names, key=lambda n: 0 if draft[n][0] in DIAGONALS else 1):
+            key_now, release_now = draft[name]
             line = QHBoxLayout()
             key = QComboBox()
             key.addItem("None", None)
             for k in list(keys_for(p.system.name)[:4]) + list(DIAGONALS) + [k for k in keys_for(p.system.name) if k.isdigit()]:
                 key.addItem(KEY_LABELS.get(k, k), k)
-            if not key_available(p.system.name, g.key):
-                key.addItem(f"{g.key}  (not on this system's controller)", g.key)
-            key.setCurrentIndex(max(0, key.findData(g.key)))
-            key.currentIndexChanged.connect(lambda _x, n=g.name, c=key: controller.set_group_key(n, c.currentData()))
+            if key_now and not key_available(p.system.name, key_now):
+                key.addItem(f"{key_now}  (not on this system's controller)", key_now)
+            key.setCurrentIndex(max(0, key.findData(key_now)))
+            key.currentIndexChanged.connect(lambda _x, n=name, c=key: self._set_key(n, c))
+            self._key_boxes[name] = key
             line.addWidget(key)
-            line.addWidget(QLabel(f"held plays <b>{g.name}</b>, on release"))
-            rc = ReleaseChoice(p, g.on_release, "Stay on last frame", lambda: None)
-            rc.currentIndexChanged.connect(lambda _x, n=g.name: controller.set_group_release(n, self._rc[n].rule()))
-            self._rc[g.name] = rc
+            line.addWidget(QLabel(f"held plays <b>{name}</b>, on release"))
+            rc = ReleaseChoice(p, release_now, "Stay on last frame", lambda: None)
+            rc.currentIndexChanged.connect(lambda _x, n=name: self._set_release(n))
+            self._rc[name] = rc
             line.addWidget(rc)
             lay.addLayout(line)
         close = QPushButton("Close")
         close.clicked.connect(self.accept)
         lay.addWidget(close, 0, Qt.AlignRight)
+
+    def _set_key(self, name: str, box: QComboBox) -> None:
+        key = box.currentData()
+        owner = next((n for n, (k, _r) in self.draft.items() if key and k == key and n != name), None)
+        if owner is not None:
+            if not messages.choose(self, groups.msg_move_key(key, owner, name), "", "Move", "Cancel"):
+                box.blockSignals(True)
+                box.setCurrentIndex(max(0, box.findData(self.draft[name][0])))
+                box.blockSignals(False)
+                return
+            self.draft[owner][0] = None
+            other = self._key_boxes.get(owner)
+            if other is not None:
+                other.blockSignals(True)
+                other.setCurrentIndex(0)
+                other.blockSignals(False)
+        self.draft[name][0] = key
+
+    def _set_release(self, name: str) -> None:
+        self.draft[name][1] = self._rc[name].rule()
 
 
 class ControlWindow(QDialog):
@@ -367,10 +399,12 @@ class ControlWindow(QDialog):
         p = self.project
         self.d_rules = copy.deepcopy(p.control_rules) if p is not None else []
         self.d_trans = copy.deepcopy(p.transitions) if p is not None else []
+        self.d_keys = ({g.name: [g.key, copy.deepcopy(g.on_release)] for g in p.groups if g.key}
+                       if p is not None else {})                  # Group keys: changed only by Apply
         self.rebuild()
 
     def _group_keys(self) -> None:
-        GroupKeysDialog(self, self.controller).exec()
+        GroupKeysDialog(self, self.controller, self.d_keys).exec()
 
     def _apply(self) -> None:
         p = self.project
@@ -380,7 +414,7 @@ class ControlWindow(QDialog):
         for r in rules:
             if any(k in ACTION_KEYS for k in r.keys):
                 r.once = True                                      # an action key plays its group once
-        if self.controller.set_rules_and_transitions(rules, copy.deepcopy(self.d_trans)):
+        if self.controller.set_rules_and_transitions(rules, copy.deepcopy(self.d_trans), copy.deepcopy(self.d_keys)):
             self.accept()
 
     # ---- state ----------------------------------------------------------------------------------
