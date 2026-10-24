@@ -92,22 +92,38 @@ def rules_json(project: Project) -> str:
     return json.dumps(doc, indent=2, ensure_ascii=False) + "\n"
 
 
+FORMULA_STARTS = ("=", "+", "-", "@")
+
+
+def _cell(value) -> str:
+    """One cell of the tab-separated file. Tabs and line breaks are taken out so a cell never splits, and a cell that a
+    spreadsheet would read as a formula (starting with = + - or @) gets a leading ' so it shows as plain text."""
+    text = " ".join(str(value).replace("\t", " ").splitlines())
+    return "'" + text if text.startswith(FORMULA_STARTS) else text
+
+
+def _row(*cells) -> str:
+    return "\t".join(_cell(c) for c in cells)
+
+
 def rules_text(project: Project) -> str:
     """Tab-separated: a rules table, a blank line, then a groups table."""
-    lines = [f"RunSpriteRun rules\t{project.name}\t{project.system.name}\t{project.fps} fps\t{project.width} x {project.height}", "",
-             "Priority\tSource\tKeys\tOnly if in\tPlays\tMode\tWhen released"]
+    lines = [_row("RunSpriteRun rules", project.name, project.system.name, f"{project.fps} fps",
+                  f"{project.width} x {project.height}"), "",
+             _row("Priority", "Source", "Keys", "Only if in", "Plays", "Mode", "When released")]
     for i, r in enumerate(rule_rows(project)):
         src = "Frame Group Control" if r["source"] == "frame_group_control" else "Group key"
         mode = "Play once" if r["mode"] == "play_once" else "Loop"
-        lines.append(f"{i + 1}\t{src}\t{'+'.join(r['keys'])}\t{', '.join(r['only_if_in'] or [])}\t{r['plays']}\t{mode}\t{_release_text(r['when_released'])}")
+        lines.append(_row(i + 1, src, "+".join(r["keys"]), ", ".join(r["only_if_in"] or []), r["plays"], mode,
+                          _release_text(r["when_released"])))
     if project.transitions:
-        lines += ["", "Transition from\tTo\tPlay first (once)\tCan be interrupted"]
+        lines += ["", _row("Transition from", "To", "Play first (once)", "Can be interrupted")]
         for t in project.transitions:
-            lines.append(f"{', '.join(t.from_groups) or 'Any group'}\t{t.to}\t{t.play}\t{'Yes' if t.interruptible else 'No'}")
-    lines += ["", "Group\tFirst frame\tLast frame\tFrames\tFirst label\tLast label\tKey\tSprite sheet"]
+            lines.append(_row(", ".join(t.from_groups) or "Any group", t.to, t.play, "Yes" if t.interruptible else "No"))
+    lines += ["", _row("Group", "First frame", "Last frame", "Frames", "First label", "Last label", "Key", "Sprite sheet")]
     for g in group_rows(project):
-        lines.append(f"{g['name']}\t{g['first_frame']}\t{g['last_frame']}\t{g['frame_count']}\t{g['first_label']}\t"
-                     f"{g['last_label']}\t{g['key'] or ''}\t{g['sprite_sheet']}")
+        lines.append(_row(g["name"], g["first_frame"], g["last_frame"], g["frame_count"], g["first_label"],
+                          g["last_label"], g["key"] or "", g["sprite_sheet"]))
     return "\n".join(lines) + "\n"
 
 
@@ -120,6 +136,7 @@ def write_rules_files(project: Project, folder: str | Path) -> list[str]:
     folder = Path(folder)
     folder.mkdir(parents=True, exist_ok=True)
     txt, js = rules_file_names(project)
-    (folder / txt).write_text(rules_text(project), encoding="utf-8", newline="\n")
-    (folder / js).write_text(rules_json(project), encoding="utf-8", newline="\n")
+    from src.io.export import safe_path
+    safe_path(folder, ".", txt).write_text(rules_text(project), encoding="utf-8", newline="\n")
+    safe_path(folder, ".", js).write_text(rules_json(project), encoding="utf-8", newline="\n")
     return [txt, js]

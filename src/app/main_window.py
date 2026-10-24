@@ -38,7 +38,7 @@ from src.core.shrink import new_size, percent_label, shrink_project
 from src.app.blank_sheet_dialog import BlankSheetDialog
 from src.app.export_dialog import ExportDialog
 from src.io import paths
-from src.io.project_file import ProjectFileError, open_project
+from src.io.project_file import InvalidNameError, ProjectFileError, open_project
 from src.io.save import save_whole
 from PySide6.QtWidgets import QFileDialog
 import shutil
@@ -347,6 +347,9 @@ class MainWindow(QMainWindow):
             return
         try:
             project = open_project(path)
+        except InvalidNameError:
+            messages.warn(self, f"{Path(path).name} {InvalidNameError.MESSAGE}")
+            return
         except ProjectFileError:
             messages.warn(self, f"{Path(path).name} could not be opened. It may be damaged or saved by a "
                                 "different version of RunSpriteRun.")

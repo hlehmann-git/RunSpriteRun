@@ -209,3 +209,73 @@ def test_help_contains_real_instructions(app: QApplication) -> None:
         assert "RunSpriteRun" in text
     finally:
         dialog.deleteLater()
+
+
+# ---- safe project loading and writing ---------------------------------------------------------------
+def _saved_with_group(tmp_path: Path, name: str) -> Path:
+    """Save a normal project, then change a group name inside the .rsr the way a hand-edited file would."""
+    import json
+    import zipfile
+    p = project()
+    p.groups = [Group("Walk", 0, 2)]
+    good = tmp_path / "good" / "Review.rsr"
+    good.parent.mkdir()
+    save_whole(p, good)
+    bad = tmp_path / "Review.rsr"
+    with zipfile.ZipFile(good) as zin, zipfile.ZipFile(bad, "w") as zout:
+        for item in zin.infolist():
+            data = zin.read(item.filename)
+            if item.filename.endswith(".json"):
+                meta = json.loads(data)
+                if "groups" in meta:
+                    meta["groups"][0]["name"] = name
+                    data = json.dumps(meta).encode()
+            zout.writestr(item, data)
+    return bad
+
+
+@pytest.mark.parametrize("name", ["x\\..\\..\\evil", "../evil", "a:stream", "=HYPERLINK(1)", "", "a b"])
+def test_project_with_invalid_group_name_is_refused(tmp_path: Path, name: str) -> None:
+    from src.io.project_file import InvalidNameError
+    with pytest.raises(InvalidNameError):
+        open_project(_saved_with_group(tmp_path, name))
+
+
+def test_project_with_valid_group_name_still_opens(tmp_path: Path) -> None:
+    assert open_project(_saved_with_group(tmp_path, "Walk_Left-2")).groups[0].name == "Walk_Left-2"
+
+
+@pytest.mark.parametrize("name", ["..\\evil", "../evil", "a:b", "a/b"])
+def test_write_refuses_names_that_leave_the_output_folder(tmp_path: Path, name: str) -> None:
+    from src.io import export
+    p = project()
+    p.groups = [Group(name, 0, 2)]
+    with pytest.raises(OSError):
+        export.write_all(p, tmp_path / "Review", T, with_data=True)
+    assert not any(f.name.startswith("evil") for f in tmp_path.rglob("*"))
+
+
+def test_save_only_deletes_files_it_names_itself(tmp_path: Path) -> None:
+    folder = tmp_path / "Review"
+    folder.mkdir()
+    p = project()
+    save_whole(p, folder / "Review.rsr")
+    keep = folder / "Sprites" / "Someone_else.png"
+    keep.write_bytes(b"not ours")
+    stale = folder / "Sprites" / "Review_Old_Frame_009.png"
+    stale.write_bytes(b"ours")
+    p.written_files = list(p.written_files) + ["Sprites/Someone_else.png", "Sprites/Review_Old_Frame_009.png"]
+    save_whole(p, folder / "Review.rsr")
+    assert keep.exists()
+    assert not stale.exists()
+
+
+def test_rules_text_cells_are_never_formulas() -> None:
+    p = project()
+    p.groups = [Group("-Walk", 0, 1), Group("Run", 2, 2, key="D")]
+    p.control_rules = [ControlRule(["D"], "-Walk")]
+    text = rules_export.rules_text(p)
+    for line in text.splitlines():
+        for cell in line.split("\t"):
+            assert not cell.startswith(("=", "+", "-", "@"))
+    assert "'-Walk" in text

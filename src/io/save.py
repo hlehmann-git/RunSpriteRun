@@ -33,4 +33,4 @@ def save_whole(project: Project, rsr_path: str | Path) -> None:
     except BaseException:
         project.written_files = old
         raise
-    export.remove_stale(folder, old, written)
+    export.remove_stale(folder, old, written, project.name)

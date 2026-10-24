@@ -37,6 +37,19 @@ def largest_sheet(project: Project) -> tuple[int, int]:
     return max(sizes, key=lambda s: s[0] * s[1])
 
 
+def safe_path(folder: Path, rel_folder: str, file_name: str) -> Path:
+    """`folder/rel_folder/file_name`, after checking the file stays directly inside that output folder. Names come
+    from the project (project name, group names, frame labels), so a name with a path separator, a drive or stream
+    colon or a dot-dot part is refused with OSError and nothing is written outside the project."""
+    if (not file_name or file_name in (".", "..") or any(ch in file_name for ch in '\\/:*?"<>|')
+            or any(ord(ch) < 32 for ch in file_name)):
+        raise OSError(f"{file_name!r} is not a safe file name.")
+    target = Path(folder) / rel_folder / file_name
+    if target.resolve().parent != (Path(folder) / rel_folder).resolve():
+        raise OSError(f"{file_name!r} would be written outside the project folder.")
+    return target
+
+
 def write_all(project: Project, folder: Path, fill: Colour, with_data: bool) -> list[str]:
     """Write every sheet, every frame PNG and (when asked) the frame data files under `folder`. The three folders
     are created even when nothing goes in one. Returns the relative paths written. Raises OSError."""
@@ -47,12 +60,12 @@ def write_all(project: Project, folder: Path, fill: Colour, with_data: bool) -> 
 
     def put_sheet(rel_folder: str, file_name: str, indices: list[int]) -> None:
         sheet = sheets.build_sheet(project, indices, fill)
-        sheet.image.save(folder / rel_folder / file_name, format="PNG")
+        sheet.image.save(safe_path(folder, rel_folder, file_name), format="PNG")
         written.append(f"{rel_folder}/{file_name}")
         if with_data:
             data_name = file_name[:-4] + ".txt"
             text = sheets.frame_data_text(project, file_name, sheet.image.size, sheet.positions)
-            (folder / rel_folder / data_name).write_text(text, encoding="utf-8", newline="\n")
+            safe_path(folder, rel_folder, data_name).write_text(text, encoding="utf-8", newline="\n")
             written.append(f"{rel_folder}/{data_name}")
 
     put_sheet(FOLDER_SHEET, sheets.all_sheet_name(project), list(range(len(project.frames))))
@@ -60,7 +73,7 @@ def write_all(project: Project, folder: Path, fill: Colour, with_data: bool) -> 
         put_sheet(FOLDER_GROUP_SHEETS, sheets.group_sheet_name(project, g.name), list(range(g.first, g.last + 1)))
     for i, frame in enumerate(project.frames):
         name = sheets.frame_file_name(project, i)
-        frame.image.save(folder / FOLDER_SPRITES / name, format="PNG")
+        frame.image.save(safe_path(folder, FOLDER_SPRITES, name), format="PNG")
         written.append(f"{FOLDER_SPRITES}/{name}")
     from src.io import rules_export
     try:
@@ -86,13 +99,17 @@ def clean_written_list(items) -> list[str]:
     return out
 
 
-def remove_stale(folder: Path, old: list[str], new: list[str]) -> None:
+def remove_stale(folder: Path, old: list[str], new: list[str], project_name: str | None = None) -> None:
     """Delete files Save wrote last time that this Save did not write again. Anything not on the old list is
-    never touched. Problems deleting a file are ignored (the file stays)."""
+    never touched. The old list comes from the .rsr file, so with `project_name` only files named the way Save
+    names them (<project>_....png or .txt) are deleted. Problems deleting a file are ignored (the file stays)."""
     folder = Path(folder)
     keep = set(new)
     for rel in clean_written_list(old):
         if rel in keep:
+            continue
+        name = rel.split("/")[1]
+        if project_name is not None and not (name.startswith(f"{project_name}_") and name.endswith((".png", ".txt"))):
             continue
         path = folder / rel
         try:

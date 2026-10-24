@@ -23,7 +23,7 @@ from src.core.colour import snap_colour
 from src.core.importer import ImportedFrame, ImportResult
 from src.core.systems import SYSTEMS, get_system
 from src.io import paths
-from src.io.project_file import ProjectFileError, open_project
+from src.io.project_file import InvalidNameError, ProjectFileError, open_project
 
 DEFAULT_SYSTEM = "Atari ST"
 NAME_HINT = "Letters, numbers, - and _ only (no spaces), 1 to 40 characters"
@@ -621,6 +621,9 @@ class StartProjectDialog(QDialog):
         """Open a saved project. A damaged file shows the PRD message and the dialog stays."""
         try:
             self.project = open_project(path)
+        except InvalidNameError:
+            messages.warn(self, f"{Path(path).name} {InvalidNameError.MESSAGE}")
+            return
         except ProjectFileError:
             messages.warn(self, f"{path.name} could not be opened. It may be damaged or saved by a "
                                 "different version of RunSpriteRun.")

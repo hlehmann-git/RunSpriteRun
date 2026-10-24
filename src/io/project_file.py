@@ -14,7 +14,7 @@ from PIL import Image
 from src.core.layers import colours_of, flatten
 from src.core.project import ControlRule, Frame, Group, Project, Rule, Transition
 from src.core.rules import ACTION_KEYS, has_opposites
-from src.core.rules import FPS_CHOICES, MAX_FRAMES, MAX_SIZE, MIN_SIZE, valid_label, valid_project_name
+from src.core.rules import FPS_CHOICES, MAX_FRAMES, MAX_SIZE, MIN_SIZE, valid_group_name, valid_label, valid_project_name
 from src.core.systems import get_system
 
 FORMAT_VERSION = 1
@@ -23,6 +23,14 @@ MAX_ENTRY_BYTES = 8 * 1024 * 1024
 
 class ProjectFileError(Exception):
     """The file is damaged, unreadable or from another version. Nothing is opened partly."""
+
+
+class InvalidNameError(ProjectFileError):
+    """A group name in the file breaks the naming rules. RunSpriteRun never saves such a name, so the file was
+    changed outside the program; it is refused because names become parts of file names on Save and Export."""
+
+    MESSAGE = ("contains a frame group name that RunSpriteRun does not allow (names can only use letters, "
+               "numbers, - and _). The file was changed outside RunSpriteRun, so it was not opened.")
 
 
 def _rule_to_json(r: Rule | None):
@@ -188,8 +196,12 @@ def open_project(path: str | Path) -> Project:
                             on_release=_rule_from_json(g.get("on_release")),
                             colour=tuple(g.get("colour", (0, 0, 0))))
                       for g in meta.get("groups", [])]
+            group_names: set[str] = set()
             for g in groups:
-                if not (0 <= g.first <= g.last < len(frames)):
+                if not isinstance(g.name, str) or not valid_group_name(g.name) or g.name.lower() in group_names:
+                    raise InvalidNameError("A frame group name in the file is not valid.")
+                group_names.add(g.name.lower())
+                if not (isinstance(g.first, int) and isinstance(g.last, int) and 0 <= g.first <= g.last < len(frames)):
                     raise ProjectFileError("A frame group in the file is outside the frames.")
 
             control = []
