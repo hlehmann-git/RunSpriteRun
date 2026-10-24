@@ -42,7 +42,7 @@ Found a bug or have an idea? Please [open an issue](https://github.com/hlehmann-
 
 ## Help
 
-The full user guide is in [docs/HELP.md](docs/HELP.md).
+The full user guide is in [docs/HELP.md](docs/HELP.md). The same guide opens inside the program with **F1** (or Help in the menu).
 
 ## Getting the program
 

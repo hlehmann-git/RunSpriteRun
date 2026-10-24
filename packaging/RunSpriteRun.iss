@@ -1,5 +1,5 @@
 ; Inno Setup recipe: makes RunSpriteRun_Setup_v<version>.exe from the PyInstaller folder dist\RunSpriteRun.
-; Built by the GitHub workflow: ISCC /DAppVersion=<version> packaging\RunSpriteRun.iss
+; Built on the PC by build_installer.bat: ISCC /DAppVersion=<version> packaging\RunSpriteRun.iss
 #ifndef AppVersion
   #define AppVersion "0.0.0"
 #endif

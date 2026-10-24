@@ -109,6 +109,7 @@ A project can start from one sprite sheet, only here and only once. The sheet sh
 - The program finds the boxes from lines in the **Box colour** (default bright green #00FF00). All boxes must be the same size, 4 to 128 pixels each way.
 - The inside of each box becomes a frame. A box that is entirely the **Transparent colour** (default magenta #FF00FF) is treated as empty and left out.
 - The two colours must be different. If the sheet needs more colours than the system allows, the whole sheet is refused.
+- If the frame size you set is larger than the boxes, each sprite is centred on the bigger canvas and the extra area is filled with the transparent colour you chose.
 - On the first Save, a copy of the original sheet is placed in the project folder. The original is never changed.
 
 ### Create Project
@@ -234,7 +235,7 @@ How the rules work:
 - **The top rule wins.** Rules are checked from the top and the first rule whose keys are all held plays. Put the more specific rules higher: W+D+1 above W+D above D. Use the up and down arrows to move a rule, and the cross to delete it.
 - **Play once** plays the group one time and will not play it again until you let go of the keys. Then the next matching rule, or the group of the newest key you are holding, takes over. For example: hold D (Walk right), then press A. A rule D+A that plays TurnLeft once shows the turn, and then Walk left starts.
 - **Adding a key to a chord** works too. While W+D is held, pressing 1 as well switches to a W+D+1 rule (for example a shot), and letting go of 1 returns to the W+D group.
-- **Group keys.** Older projects only: if a group has a key of its own, a Group keys button appears at the bottom of the window and opens a small list where you can still change that key and its release choice. They apply after your rules: a diagonal beats a single key, otherwise the key pressed last wins. A key that your system's controller does not have is marked "not on this system's controller", but still works.
+- **Group keys.** Older projects only: if a group has a key of its own, a Group keys button appears at the bottom of the window and opens a small list where you can still change that key and its release choice. They apply after your rules: a diagonal beats a single key, otherwise the key pressed last wins. A key that your system's controller does not have is marked "not on this system's controller", but still works. Changes made in this list are kept only when you press Apply in Frame Group Control; Cancel throws them away.
 - **Changing groups.** If you rename a group, its rules follow. If you delete a group, or delete frames that leave it empty, the rules that play it are removed and the program lists them first. A row marked in red cannot work yet (for example a rule hidden under another rule with fewer keys, or a group used by both an action key and a normal rule), and Apply stays greyed out until you fix it.
 
 Press Apply to save all your changes at once; they count as one step that Ctrl+Z undoes. Cancel, Esc and the X in the title bar close the window and throw the changes away. The rules are saved in the project, and Save and Export also write them as text and JSON files (see Saving and Export).
@@ -484,7 +485,7 @@ Saved and exported sheets use the same layout as a blank sheet, so a sheet can b
 
 ### About and Help
 
-**Help** (F1) opens the built-in help. **About** shows the version and author.
+**Help** (F1) opens this manual inside the program, in a window you can scroll. **About** shows the version and author.
 
 ## 10. Reference
 
@@ -520,7 +521,7 @@ Saved and exported sheets use the same layout as a blank sheet, so a sheet can b
 | Frames per project | 120 |
 | Frame groups per project | 32 |
 | Project name | 1 to 40 characters (letters, numbers, - and _) |
-| Group name | 1 to 20 characters |
+| Group name | 1 to 20 characters (letters, numbers, - and _) |
 | Frame label name | 1 to 60 characters |
 | Sprite colours | 16 or 32, set by the system, including the transparent colour |
 | Blank sprite sheet | 120 sprites, up to 2,048 pixels wide |
@@ -551,6 +552,14 @@ A Frame Group Control rule never plays. Rules are checked from the top, so a rul
 **I shrunk or reduced a project by mistake.** Those two tools cannot be undone. Close the project without saving, and open the saved version again.
 
 **The Save As name is orange.** The name is over 40 characters or contains a space or symbol. Shorten it or remove the characters.
+
+**A project will not open.** The message says why. A project whose frame group names break the naming rules (1 to 20 letters, numbers, - and _) is not opened, because RunSpriteRun never saves such a name, so the file has been changed outside the program or is damaged. Open an earlier copy of the project if you have one.
+
+**Save is refused because of too many colours.** The frames use more colours than the system allows, so the project could not be opened again. Delete or replace colours in the palette (or use Edit > Reduce Palette), then save.
+
+**Save or Export stops with a message about the rules file.** The program writes ProjectName_Rules.txt and ProjectName_Rules.json first and stops if it cannot, for example when the folder is read-only or a file is open in a spreadsheet. Close the file or free the folder and try again. An imported sprite sheet is kept for the next Save.
+
+**A palette colour cannot be deleted while editing.** A step in the Edit mode Undo history still uses it. Apply or discard your edits first.
 
 **Colours look different from my art program.** The program snaps every colour to the nearest one the chosen system can display. That is deliberate: what you see is what the system could show.
 
