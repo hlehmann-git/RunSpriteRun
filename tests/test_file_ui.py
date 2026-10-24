@@ -13,6 +13,7 @@ from src.app import messages, save_as_dialog
 from src.app.info_dialogs import AboutDialog, HelpDialog, ProjectInformationDialog, information_rows
 from src.app.main_window import MainWindow
 from src.app.settings_dialog import SettingsDialog
+from src.version import VERSION
 from src.core.colour import level_to_8bit as lv
 from src.core.project import Frame, Group, Project
 from src.core.systems import get_system
@@ -220,7 +221,7 @@ def test_help_and_about_text(win):
     help_text = HelpDialog(win).text.toPlainText()
     assert "Frame Group Control" in help_text and "Lorem ipsum" not in help_text
     a = AboutDialog(win)
-    assert a.author.text() == "by Harley Lehmann" and a.version.text() == "Version 2.0.15"
+    assert a.author.text() == "by Harley Lehmann" and a.version.text() == f"Version {VERSION}"
     assert "5649" in a.comments.text() and not a.picture.pixmap().isNull()
     assert a.picture.pixmap().width() == 480
     assert "Deluxe Paint" in a.description.text() and "Buddy Claude" in a.small_print.text()

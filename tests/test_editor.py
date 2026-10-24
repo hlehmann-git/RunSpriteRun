@@ -801,6 +801,8 @@ def test_tool_letters_choose_tools_in_edit_mode_only(win, monkeypatch):
     e = win.controller.edit
     monkeypatch.setattr(win, "isActiveWindow", lambda: True)
     monkeypatch.setattr(win, "_text_focus", lambda: False)
+    from PySide6.QtWidgets import QApplication
+    monkeypatch.setattr(QApplication, "activeModalWidget", staticmethod(lambda: None))   # a dialog left by another test file
     key = lambda k, m=Qt.NoModifier: win._edit_key(QKeyEvent(QEvent.KeyPress, k, m))
     for k, tool in ((Qt.Key_E, "eraser"), (Qt.Key_B, "bucket"), (Qt.Key_S, "select"), (Qt.Key_M, "move"),
                     (Qt.Key_L, "line"), (Qt.Key_R, "square"), (Qt.Key_O, "circle"), (Qt.Key_P, "pencil")):
