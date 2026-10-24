@@ -14,6 +14,9 @@ from src.io.project_file import save_project
 def save_whole(project: Project, rsr_path: str | Path) -> None:
     """Raises OSError if anything cannot be written. The .rsr is written last, so it always lists the files
     that really exist."""
+    if len(project.palette()) > project.system.max_colours:      # such a file could never be opened again
+        raise OSError(f"The project uses {len(project.palette())} colours but {project.system.name} allows "
+                      f"{project.system.max_colours}. Delete or merge colours first.")
     folder = Path(rsr_path).parent
     old = list(project.written_files)
     if project.source_sheet:                       # the imported sheet is kept in the project folder (FR-1.5)

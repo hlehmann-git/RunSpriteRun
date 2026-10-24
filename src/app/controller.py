@@ -454,6 +454,8 @@ class Controller(QObject):
             return "That colour is not in the palette"
         if self.edit.mode and self.edit.floating is not None:
             return "Press Enter to fix the paste or Esc to discard it first."
+        if self.edit.mode and self.edit.history_uses(colours[slot]):
+            return "This colour is used by an earlier edit step (Undo)"
         return editing.can_delete_colour(p, colours[slot])
 
     def delete_colour(self, slot: int) -> bool:

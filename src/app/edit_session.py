@@ -5,7 +5,7 @@ from __future__ import annotations
 from PIL import Image
 from PySide6.QtCore import QObject, Signal
 
-from src.core import edit as edit_rules, editing, history, layers as L, tools
+from src.core import edit as edit_rules, editing, history, layers as L, palette, tools
 from src.core.colour import Colour
 from src.core.project import Frame
 
@@ -201,6 +201,15 @@ class EditSession(QObject):
         f.image, f.layers = take.pop()
         self._edited()
         return True
+
+    def history_uses(self, colour) -> bool:
+        """True if an Undo or Redo step of this edit has a pixel of `colour` (so deleting it could come back)."""
+        colour = tuple(colour)
+        for image, layers in self._undo + self._redo:
+            for im in (image,) if layers is None else (image, *layers):
+                if any(c == colour for _n, c in im.getcolors(im.width * im.height)):
+                    return True
+        return False
 
     def _push_undo(self, image, layers) -> None:
         self._undo.append((image, layers))
@@ -653,10 +662,21 @@ class EditSession(QObject):
             self.changed.emit()
 
     def colour_replaced(self, old, new) -> None:
-        """A palette colour was replaced: copied pixels of that colour take the new colour."""
+        """A palette colour was replaced: the Undo and Redo steps of this edit and copied pixels of that colour
+        take the new colour too, so an Undo can never bring back a colour that has left the palette."""
+        old, new = tuple(old), tuple(new)
+        if old == new:
+            return
+
+        def remap_step(step):
+            image, layers = step
+            return (palette.remap_image(image, old, new),
+                    None if layers is None else tuple(palette.remap_image(im, old, new) for im in layers))
+
+        self._undo = [remap_step(s) for s in self._undo]
+        self._redo = [remap_step(s) for s in self._redo]
         if self.clipboard is None:
             return
-        old, new = tuple(old), tuple(new)
         out = {}
         for i, im in self.clipboard["layers"].items():
             im = im.copy()

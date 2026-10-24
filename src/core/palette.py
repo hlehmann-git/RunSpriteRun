@@ -14,6 +14,20 @@ from .systems import System
 SQUARE = 128
 
 
+def remap_image(img: Image.Image, old: Colour, new: Colour) -> Image.Image:
+    """A copy of the RGB image `img` with every pixel of colour `old` changed to `new`. The same image comes back
+    when it has no pixel of `old`, so earlier states (undo) keep their own images."""
+    old, new = tuple(old), tuple(new)
+    data = img.tobytes()
+    out = bytearray(data)
+    changed = False
+    for i in range(0, len(data), 3):
+        if (data[i], data[i + 1], data[i + 2]) == old:
+            out[i:i + 3] = bytes(new)
+            changed = True
+    return Image.frombytes("RGB", img.size, bytes(out)) if changed else img
+
+
 def replace_colour(project: Project, old: Colour, new: Colour) -> None:
     """Every pixel of colour `old` becomes `new` (snapped to the system). New image objects are made so
     that earlier states (undo) keep their own images. If `old` was the transparent colour the transparent
@@ -22,14 +36,7 @@ def replace_colour(project: Project, old: Colour, new: Colour) -> None:
     if new == old:
         return
     def remap(img):
-        data = img.tobytes()
-        out = bytearray(data)
-        changed = False
-        for i in range(0, len(data), 3):
-            if (data[i], data[i + 1], data[i + 2]) == old:
-                out[i:i + 3] = bytes(new)
-                changed = True
-        return Image.frombytes("RGB", img.size, bytes(out)) if changed else img
+        return remap_image(img, old, new)
 
     for f in project.frames:
         f.image = remap(f.image)
