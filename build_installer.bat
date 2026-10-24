@@ -25,13 +25,9 @@ del build_version.txt
 if "%VERSION%"=="" goto :fail
 echo       Version %VERSION%
 
-echo [2/6] Checking PyInstaller is installed...
-"%PY%" -m PyInstaller --version >nul 2>&1
-if errorlevel 1 (
-  echo       Not found. Installing it now...
-  "%PY%" -m pip install pyinstaller
-  if errorlevel 1 goto :fail
-)
+echo [2/6] Checking the build tools (exact versions, hash-checked)...
+"%PY%" -m pip install --quiet --require-hashes -r packaging\build-tools.txt
+if errorlevel 1 goto :fail
 
 echo [3/6] Making the program icon...
 "%PY%" packaging\make_icon.py

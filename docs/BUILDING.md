@@ -23,10 +23,11 @@ Install Python 3.12 (64-bit) with "Add python.exe to PATH" ticked, then, in a Co
 ```
 python -m venv .venv
 .venv\Scripts\activate
-pip install -r requirements.txt pyinstaller
+pip install -r requirements.txt
+pip install --require-hashes -r packaging\build-tools.txt
 ```
 
-This puts PySide6, Pillow and PyInstaller in a private `.venv` folder that does not affect anything else on the PC.
+This puts PySide6, Pillow and PyInstaller in a private `.venv` folder that does not affect anything else on the PC. The build tools are exact versions listed in `packaging/build-tools.txt`, each checked against its published hash; `build_installer.bat` checks them again every time it runs.
 
 ## 5. Build (every time)
 
