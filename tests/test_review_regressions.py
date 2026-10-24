@@ -195,7 +195,6 @@ def test_s_select_shortcut_through_actual_event_filter(app: QApplication, monkey
         QApplication.sendPostedEvents(None, QEvent.DeferredDelete)
 
 
-@pytest.mark.xfail(strict=True, reason="F07: F1 shows placeholder text rather than the user guide")
 def test_help_contains_real_instructions(app: QApplication) -> None:
     dialog = HelpDialog(None)
     try:
@@ -343,3 +342,14 @@ def test_normal_rule_still_uses_group_default_release() -> None:
     r.tick()
     assert r.release("D")
     assert r.frame == 0
+
+
+def test_help_shows_a_note_when_the_manual_is_missing(app: QApplication, monkeypatch: pytest.MonkeyPatch,
+                                                      tmp_path: Path) -> None:
+    from src.app import info_dialogs
+    monkeypatch.setattr(info_dialogs, "HELP_FILE", tmp_path / "missing.md")
+    dialog = HelpDialog(None)
+    try:
+        assert "could not be found" in dialog.text.toPlainText()
+    finally:
+        dialog.deleteLater()

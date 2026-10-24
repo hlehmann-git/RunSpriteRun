@@ -8,7 +8,8 @@ ICON = os.path.join(SPECPATH, "RunSpriteRun.ico")
 a = Analysis(
     [os.path.join(ROOT, "main.py")],
     pathex=[ROOT],
-    datas=[(os.path.join(ROOT, "src", "app", "assets"), os.path.join("src", "app", "assets"))],
+    datas=[(os.path.join(ROOT, "src", "app", "assets"), os.path.join("src", "app", "assets")),
+           (os.path.join(ROOT, "docs", "HELP.md"), "docs")],             # the manual shown by Help (F1)
     excludes=["tkinter"],
 )
 pyz = PYZ(a.pure)

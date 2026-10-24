@@ -5,7 +5,7 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont, QPixmap
-from PySide6.QtWidgets import (QDialog, QGridLayout, QHBoxLayout, QLabel, QPlainTextEdit, QPushButton, QSpinBox,
+from PySide6.QtWidgets import (QDialog, QGridLayout, QHBoxLayout, QLabel, QPushButton, QSpinBox, QTextBrowser,
                                QVBoxLayout, QWidget)
 
 from src.core.project import Project
@@ -20,16 +20,16 @@ ABOUT_DESCRIPTION = [
     "editing and saving. Think Deluxe Paint for the Amiga but stripped down to what you want and need.",
     "Work in the system you want.  It's all you."]
 ABOUT_SMALL_PRINT = ["Made by Harley Lehmann with my Buddy Claude.", "Built with Python, PySide6 and Pillow."]
-PLACEHOLDER = ["Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
-               "Sed do eiusmod tempor incididunt ut labore et dolore.",
-               "Ut enim ad minim veniam, quis nostrud exercitation.",
-               "Duis aute irure dolor in reprehenderit in voluptate.",
-               "Excepteur sint occaecat cupidatat non proident.",
-               "Sunt in culpa qui officia deserunt mollit anim id est laborum.",
-               "Curabitur pretium tincidunt lacus, nulla gravida orci a odio.",
-               "Nullam varius, turpis et commodo pharetra, est eros bibendum elit.",
-               "Integer ac sem ut nibh dapibus tristique.",
-               "Vestibulum ante ipsum primis in faucibus orci luctus."]
+HELP_FILE = Path(__file__).resolve().parents[2] / "docs" / "HELP.md"     # also inside the installed program (packaging spec)
+HELP_MISSING = "The RunSpriteRun manual (docs/HELP.md) could not be found next to the program."
+
+
+def help_text() -> str:
+    """The user manual as Markdown, or a short note if the file is missing."""
+    try:
+        return HELP_FILE.read_text(encoding="utf-8")
+    except OSError:
+        return HELP_MISSING
 
 
 def information_rows(p: Project) -> list[tuple[str, str]]:
@@ -90,16 +90,18 @@ class ProjectInformationDialog(QDialog):
 
 
 class HelpDialog(QDialog):
-    """Ten lines of placeholder text for the owner to replace (Help menu)."""
+    """Help (F1): the RunSpriteRun manual (docs/HELP.md), shown formatted and scrollable."""
 
     def __init__(self, parent: QWidget) -> None:
         super().__init__(parent)
         self.setWindowTitle("RunSpriteRun Help")
         self.setWindowFlag(Qt.WindowContextHelpButtonHint, False)
-        self.setMinimumWidth(480)
-        self.text = QPlainTextEdit("\n".join(PLACEHOLDER))
-        self.text.setReadOnly(True)
-        self.text.setFixedHeight(10 * self.text.fontMetrics().lineSpacing() + 20)
+        self.setMinimumSize(560, 420)
+        self.resize(820, 680)
+        self.text = QTextBrowser()
+        self.text.setOpenLinks(False)                    # the manual is read here only; no link leaves the window
+        self.text.setOpenExternalLinks(False)
+        self.text.setMarkdown(help_text())
         ok = QPushButton("OK")
         ok.setDefault(True)
         ok.clicked.connect(self.accept)
@@ -109,7 +111,7 @@ class HelpDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 20, 20, 16)
         layout.setSpacing(16)
-        layout.addWidget(self.text)
+        layout.addWidget(self.text, 1)
         layout.addLayout(buttons)
 
 
