@@ -282,6 +282,7 @@ The card at the top right holds the project's palette and the tools to change it
 - The palette has exactly as many slots as the system's maximum sprite colours (16 or 32). Used slots show a colour; free slots are blank with their slot number.
 - The title shows the counts, for example "9 used, 7 free of 16".
 - It lists the colours used in the frames, in order of first appearance. A colour that no frame uses any more stays in the palette, in its slot, and still counts toward the colour limit, until you delete it (right-click it and choose Delete colour) or reduce the palette.
+- **Changing the order.** Drag a colour square onto another slot: it moves there, and the colours in between move along one place. Dropping it on a free slot moves it to the end of the colours. A yellow outline shows where it will go. Only the order changes, never a pixel. The order is saved with the project and used for the colour bar on saved sheets. Ctrl+Z undoes a move (in Edit mode it is part of the edits you apply or discard).
 
 ### Replacing a colour
 
@@ -296,13 +297,12 @@ The SNES colour square shows a stepped subset of its colours; the sliders and He
 
 ### Adding a colour
 
-The + button, between the transparent colour box and the eyedropper, adds a new colour to the next free slot. In Edit mode the + CLR tool does exactly the same. Both are greyed out when the palette is full, and on the Commodore 64 and Apple II Double Hi-Res, whose colours are fixed.
+The + button, between the transparent colour box and the eyedropper, adds the **primary colour** (the front square) to the next free palette slot straight away. In Edit mode the + CLR tool does exactly the same, and the Pencil is then ready with the new colour. Ctrl+Z undoes it.
 
-1. Click +. It is highlighted, the next free palette square is outlined in yellow, and everything else in the program is locked. The eyedropper is switched on for you.
-2. Choose the colour with the R, G and B sliders, the colour square, the Hex box, or the eyedropper (which can also pick a pixel in the Frame view). You can change between them until you are happy.
-3. Press Apply, to the right of the Hex box. Nothing is added until you do. Press Esc to cancel.
+1. Choose the colour with the R, G and B sliders, the colour square, the Hex box, or the eyedropper. It becomes the primary colour.
+2. Click +.
 
-If the colour is already in the palette, the program says "That colour is already in the palette. Choose a different colour." and stays in add mode. After Apply the program returns to normal; in Edit mode the Pencil is selected with the new colour.
+If the palette is full, the program says "The palette is full. Delete a colour or reduce the palette first." If the colour is already in the palette, it says "That colour is already in the palette." Both buttons are greyed out on the Commodore 64 and Apple II Double Hi-Res, whose colours are fixed.
 
 ### Deleting a colour
 
@@ -310,7 +310,7 @@ Right-click a palette square and choose Delete colour. A colour can be deleted o
 
 ### Eyedropper
 
-Click the eyedropper, then a palette square or a pixel in the Frame view, to copy that colour into the preview square. It is switched on for you while you are adding a colour.
+Click the eyedropper, then a palette square or a pixel in the **Frame view**, the **Frame Group Preview** or the **RunSpriteRun window**, to copy that colour: a left click sets the primary colour, a right click the secondary colour. A click on the see-through background gives the transparent colour. The previews can be playing while you pick.
 
 ### The transparent colour
 

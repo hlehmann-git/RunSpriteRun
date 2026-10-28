@@ -9,7 +9,7 @@ from PySide6.QtWidgets import QAbstractButton, QLabel, QPushButton, QWidget
 from src.app.controller import Controller
 from src.app.panel import Panel
 from src.app.theme import TOGGLE_BUTTON_STYLE
-from src.app.sprite_view import SpriteView
+from src.app.sprite_view import SpriteView, offer_to_picker
 
 
 class ToggleSwitch(QAbstractButton):
@@ -42,6 +42,7 @@ class RunPanel(Panel):
         self.controller = controller
         self.view = SpriteView(self, grid=False)         # the RunSpriteRun window has no grid at any zoom
         self.view.move(16, 38)
+        offer_to_picker(self.view, controller)            # the colour picker can take a colour from here
         self.zoom = 1
         self.max_zoom = 1
         y = 299

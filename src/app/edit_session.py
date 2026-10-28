@@ -301,7 +301,7 @@ class EditSession(QObject):
     def press(self, pos, shift: bool = False) -> bool:
         c = self.controller
         p = c.project
-        if not self.mode or p is None or not p.frames or self.tool == "plus" or self.mirror_armed or c.add_mode:
+        if not self.mode or p is None or not p.frames or self.tool == "plus" or self.mirror_armed:
             return False
         pos = tuple(pos)
         viewing = c.selected != self.idx                   # another frame is only being looked at

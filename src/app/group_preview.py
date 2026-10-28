@@ -10,7 +10,7 @@ from src.app.arrow_button import ArrowButton
 from src.app.controller import Controller
 from src.app.panel import Panel
 from src.app.theme import TOGGLE_BUTTON_STYLE
-from src.app.sprite_view import SpriteView
+from src.app.sprite_view import SpriteView, offer_to_picker
 from src.core import edit
 
 
@@ -28,6 +28,7 @@ class GroupPreviewPanel(Panel):
         short_popup(self.chooser)
         self.view = SpriteView(self, grid=False)
         self.view.move(16, 38)
+        offer_to_picker(self.view, controller)            # the colour picker can take a colour from here
         self.play_btn = QPushButton("Play", self)
         self.play_btn.setCheckable(True)                 # one on / off button: lit while the group is playing
         self.play_btn.setFocusPolicy(Qt.NoFocus)

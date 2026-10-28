@@ -24,7 +24,7 @@ The program counts colours for the whole project, not per tile or per sprite. Th
 ## What you can do
 
 - Start a project from image files, from a sprite sheet, or from a blank project, with a frame size from 4 to 128 pixels.
-- Have the colours snapped to the chosen system, with a palette and colour editor (the fixed-palette systems have their colours locked). Colours no frame uses stay in the palette until you delete them, and a **+** button adds a new colour with the sliders, the hex box or the pipette.
+- Have the colours snapped to the chosen system, with a palette and colour editor (the fixed-palette systems have their colours locked). Colours no frame uses stay in the palette until you delete them, a **+** button adds the primary colour straight away, and colours can be dragged into a new order.
 - Put up to 120 frames on a timeline, select several frames at once, delete, copy and paste them, and rename them.
 - Group frames into animations (walk left, walk right, jump and so on), set the resting and start states, and **run** the animation with the keys (W, A, S, D, the diagonals and the number keys).
 - **Frame Group Control** (the **Set Rules** button) says which keys play which group, like a game controller: a direction or a combination (W+D, W+D+1) plays a group, once or looping, a rule can fire **only after** another group (for example a left turn only after walking right), and each rule says what happens when the keys are let go. Rules read as one line each, and keys 7, 8, 9 and 0 are action keys that play a group on its own for testing. The window uses the buttons of the system (1 fire button, 3 on the Mega Drive, 6 on the SNES), and Apply saves your changes in one go.

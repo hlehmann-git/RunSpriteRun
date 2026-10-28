@@ -272,3 +272,18 @@ class SpriteView(QWidget):
             if self.guides.get("h") is not None:
                 y = (oy + self.guides["h"] * s / 2) / dpr
                 painter.drawLine(0, round(y), self.width(), round(y))
+
+
+def offer_to_picker(view: SpriteView, controller) -> None:
+    """With the colour picker (eyedropper) on, a click on a pixel of this view takes its colour, as in the Frame
+    view: left click the primary colour, right click the secondary. Used by the Frame Group Preview and the
+    RunSpriteRun window. A click on the see-through background gives the transparent colour."""
+    def pick(x: int, y: int, right: bool) -> None:
+        img = view._image
+        if not controller.eyedropper_armed or img is None:
+            return
+        colour = tuple(img.convert("RGB").getpixel((x, y)) if img.mode != "RGB" else img.getpixel((x, y)))
+        (controller.frame_pixel_right_clicked if right else controller.frame_pixel_clicked).emit(colour)
+
+    view.pixel_clicked.connect(lambda x, y: pick(x, y, False))
+    view.pixel_right_clicked.connect(lambda x, y: pick(x, y, True))

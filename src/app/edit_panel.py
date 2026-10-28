@@ -8,7 +8,7 @@ from PySide6.QtCore import QPointF, QRectF, Qt, QTimer
 from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen, QPixmap, QPolygonF
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QFrame, QLabel, QPushButton, QScrollArea, QWidget)
 
-from src.app import edit_flow
+from src.app import edit_flow, messages
 from src.app.controller import Controller
 from src.app.edit_session import DEFAULT_OPTIONS, STYLES
 from src.app.panel import Panel
@@ -22,7 +22,7 @@ TOOL_GRID = ["pencil", "eraser", "bucket", "select", "move", "plus", "line", "sq
 TOOL_TITLES = {"pencil": "Pencil", "eraser": "Eraser", "bucket": "Bucket", "select": "Select", "move": "Move",
                "plus": "+ Colour", "line": "Line", "square": "Square", "circle": "Circle"}
 TOOL_TIPS = {"pencil": "Pencil (P)", "eraser": "Eraser (E) - paints the transparent colour", "bucket": "Bucket (B) - fill",
-             "select": "Select (S) - drag a rectangle", "move": "Move (M)", "plus": "+ colour: add the Colour editor's colour to the palette",
+             "select": "Select (S) - drag a rectangle", "move": "Move (M)", "plus": "+ colour: add the primary colour to the next free palette slot",
              "line": "Line (L)", "square": "Square (R)", "circle": "Circle (O)"}
 ACTION_TIPS = {"mirror_v": "Mirror vertically: click here, then click in the Frame view to place the line. What you draw on one side appears on the other. Click again to switch off.",
                "mirror_h": "Mirror horizontally: click here, then click in the Frame view to place the line. What you draw above appears below. Click again to switch off.",
@@ -247,8 +247,6 @@ class EditPanel(Panel):
         self.edit.changed.connect(self._refresh)
         controller.frames_changed.connect(self._refresh)
         controller.project_changed.connect(self._refresh)
-        controller.add_mode_changed.connect(lambda _on: self._refresh())
-        self._add_locked: list[QWidget] = []
         self._build_options()
         self._refresh()
 
@@ -272,29 +270,24 @@ class EditPanel(Panel):
 
     def _tool_clicked(self, name: str) -> None:
         if name == "plus":
-            self.controller.toggle_add_mode()
+            add_primary_colour(self.window(), self.controller)
             return
         self.edit.set_tool(name)
 
     # ---- state -> widgets ------------------------------------------------------------------------------
     def _refresh(self) -> None:
         e = self.edit
-        for w in self._add_locked:                 # whatever the "add new colour" mode switched off comes back first
-            w.setEnabled(True)
-        self._add_locked = []
         self.v1_btn.setChecked(not e.mode)
         self.edit_btn.setChecked(e.mode)
         self.work.setEnabled(e.mode)
-        adding = self.controller.add_mode
         for name, b in self.tool_buttons.items():
-            b.selected = (adding if name == "plus" else e.mode and not adding and name == e.tool)
+            b.selected = name != "plus" and e.mode and name == e.tool
             b.update()
         plus = self.tool_buttons["plus"]
         p = self.controller.project
-        full = p is not None and len(p.palette()) >= p.system.max_colours
         fixed = p is not None and p.system.is_fixed
-        plus.setEnabled(e.mode and not full and not fixed)
-        plus.setToolTip("The colours of this system are fixed" if fixed else "The palette is full" if full else TOOL_TIPS["plus"])
+        plus.setEnabled(e.mode and not fixed)                  # a full palette: the click says so
+        plus.setToolTip("The colours of this system are fixed" if fixed else TOOL_TIPS["plus"])
         can_rotate = e.can_rotate()
         for n in ("rotate_right", "rotate_left"):
             self.actions[n].setEnabled(e.mode and can_rotate)
@@ -304,15 +297,6 @@ class EditPanel(Panel):
             self.actions[n].update()
         self.actions["undo"].setEnabled(e.can_undo)
         self.actions["redo"].setEnabled(e.can_redo)
-        if adding:                                 # the "add new colour" mode: only the + colour button (and Esc) works
-            keep = self.tool_buttons["plus"]
-            for w in (self.v1_btn, self.edit_btn, *self.work.findChildren(QWidget)):
-                if w is not keep and w.isEnabled():
-                    w.setEnabled(False)
-                    self._add_locked.append(w)
-            if not keep.isEnabled() and self.work.isEnabled():
-                keep.setEnabled(True)
-                self._add_locked.append(keep)
         if self._built_for != e.tool:
             self._build_options()
         self._refresh_select_buttons()
@@ -446,3 +430,12 @@ class EditPanel(Panel):
         lab.setFixedHeight(max(16, lab.heightForWidth(190) + 2))
         lab.move(10, self._y)
         self._y += lab.height() + 6
+
+def add_primary_colour(parent: QWidget, controller: Controller) -> bool:
+    """The + colour button (here and as + CLR in Edit mode): add the primary colour to the next free palette slot
+    at once, or say why it can't (the palette is full, or the colour is already in it)."""
+    problem = controller.add_primary_colour()
+    if problem is not None:
+        messages.warn(parent, *problem)
+        return False
+    return True

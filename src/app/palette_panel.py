@@ -1,5 +1,5 @@
-"""Palette panel (FR-3.13), display only for now: all N slots, used slots show their colour,
-free slots are white-outlined blocks with their slot number."""
+"""Palette panel (FR-3.13): all N slots, used slots show their colour, free slots are white-outlined blocks with
+their slot number. A colour can be dragged to another slot to change the order."""
 from __future__ import annotations
 
 from PySide6.QtCore import QPoint, QRect, Qt, Signal
@@ -9,6 +9,7 @@ from PySide6.QtWidgets import QLabel, QMenu, QWidget
 from src.app.controller import Controller
 from src.app.panel import Panel
 
+DRAG_START = 4                        # pixels the mouse must move with the button down before a click becomes a drag
 SWATCH, GAP, COLUMNS = 18, 1, 16      # 16 squares per row: 16 slots = 1 row, 32 = 2 rows, 64 = 4 rows
 LEFT, TOP, BOTTOM = 16, 40, 14
 TITLE = "Palette & Colour editor"        # one card: the palette on top, the colour editor under it
@@ -18,6 +19,7 @@ class PaletteGrid(QWidget):
     slot_clicked = Signal(int)
     slot_right_clicked = Signal(int)
     slot_menu = Signal(int, QPoint)        # right click: the square and where to open the menu
+    slot_moved = Signal(int, int)          # a colour was dragged from one slot to another (0-based)
 
     def __init__(self, parent: QWidget) -> None:
         super().__init__(parent)
@@ -26,7 +28,9 @@ class PaletteGrid(QWidget):
         self.transparent: tuple[int, int, int] | None = None
         self.active: tuple[int, int, int] | None = None      # Edit mode: the primary colour
         self.secondary: tuple[int, int, int] | None = None   # Edit mode: the secondary colour
-        self.add_slot: int | None = None                      # "add new colour" mode: the free square the colour will go into
+        self._press: tuple[int, QPoint] | None = None         # the slot a left button press started on, and where
+        self.drag_from: int | None = None                     # a colour being dragged to a new place ...
+        self.drop_at: int | None = None                       # ... and the slot it would go to
         self._resize()
 
     def rows(self) -> int:
@@ -50,14 +54,51 @@ class PaletteGrid(QWidget):
                 return i
         return None
 
+    def drop_slot(self, pos) -> int:
+        """Where a dragged colour would go: the slot under the mouse, or the last used slot for a free slot or a
+        point past the end."""
+        i = self.slot_at(pos)
+        last = len(self.colours) - 1
+        if i is None:
+            col = max(0, min(COLUMNS - 1, pos.x() // (SWATCH + GAP)))
+            row = max(0, min(self.rows() - 1, pos.y() // (SWATCH + GAP)))
+            i = row * COLUMNS + col
+        return min(i, last)
+
     def mousePressEvent(self, event) -> None:
-        if event.button() in (Qt.LeftButton, Qt.RightButton):
-            i = self.slot_at(event.position().toPoint())
-            if i is not None and i < len(self.colours):      # free slots do nothing
-                if event.button() == Qt.LeftButton:
-                    self.slot_clicked.emit(i)
-                else:
-                    self.slot_menu.emit(i, event.globalPosition().toPoint())
+        pos = event.position().toPoint()
+        i = self.slot_at(pos)
+        if i is None or i >= len(self.colours):          # free slots do nothing
+            return
+        if event.button() == Qt.LeftButton:
+            self._press = (i, pos)                       # a click (on release) or the start of a drag
+        elif event.button() == Qt.RightButton:
+            self.slot_menu.emit(i, event.globalPosition().toPoint())
+
+    def mouseMoveEvent(self, event) -> None:
+        if self._press is None or not event.buttons() & Qt.LeftButton:
+            return
+        pos = event.position().toPoint()
+        if self.drag_from is None:
+            if (pos - self._press[1]).manhattanLength() < DRAG_START or len(self.colours) < 2:
+                return
+            self.drag_from = self._press[0]
+            self.setCursor(Qt.ClosedHandCursor)
+        self.drop_at = self.drop_slot(pos)
+        self.update()
+
+    def mouseReleaseEvent(self, event) -> None:
+        if event.button() != Qt.LeftButton or self._press is None:
+            return
+        start, _ = self._press
+        dragged, target = self.drag_from, self.drop_at
+        self._press = self.drag_from = self.drop_at = None
+        self.unsetCursor()
+        self.update()
+        if dragged is None:
+            self.slot_clicked.emit(start)                # a plain click
+        elif target is not None and target != dragged:
+            self.slot_moved.emit(dragged, target)
 
     def paintEvent(self, event) -> None:
         p = QPainter(self)
@@ -84,13 +125,15 @@ class PaletteGrid(QWidget):
                     f.setBold(True)
                     p.setFont(f)
                     p.drawText(r, Qt.AlignCenter, "T")
+                if self.drag_from == i:                      # the colour being moved: dimmed
+                    p.fillRect(r, QColor(20, 20, 24, 150))
             else:
                 p.setPen(QPen(QColor(255, 255, 255), 1))      # free slot: white outline and its number
                 p.drawRect(r.adjusted(0, 0, -1, -1))
                 p.setFont(small)
                 p.drawText(r, Qt.AlignCenter, str(i + 1))
-            if self.add_slot == i:
-                p.setPen(QPen(QColor("#ffd24d"), 2))
+            if self.drop_at == i and self.drag_from is not None:
+                p.setPen(QPen(QColor("#ffd24d"), 2))         # where it will go
                 p.setBrush(Qt.NoBrush)
                 p.drawRect(r.adjusted(1, 1, -2, -2))
 
@@ -113,16 +156,16 @@ class PalettePanel(Panel):
         self.grid.move(LEFT, TOP)
         self.grid.slot_clicked.connect(controller.palette_clicked.emit)
         self.grid.slot_menu.connect(self._open_menu)
+        self.grid.slot_moved.connect(controller.move_colour)
         controller.project_changed.connect(self.refresh)
         controller.frames_changed.connect(self.refresh)
         controller.edit.changed.connect(self._show_active)
-        controller.add_mode_changed.connect(self._add_mode_changed)
 
     def _open_menu(self, slot: int, where: QPoint) -> None:
         """Right click on a palette square: Set as secondary colour (Edit mode only) and Delete colour."""
         c = self.controller
         p = c.project
-        if p is None or c.add_mode or not 0 <= slot < len(p.palette()):
+        if p is None or not 0 <= slot < len(p.palette()):
             return
         menu = QMenu(self)
         if c.edit.mode:
@@ -134,11 +177,6 @@ class PalettePanel(Panel):
             act.setToolTip(reason)
         act.triggered.connect(lambda: c.delete_colour(slot))
         menu.exec(where)
-
-    def _add_mode_changed(self, on: bool) -> None:
-        p = self.controller.project
-        self.grid.add_slot = len(p.palette()) if on and p is not None else None
-        self.grid.update()
 
     def _show_active(self) -> None:
         e = self.controller.edit

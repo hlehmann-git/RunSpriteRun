@@ -155,13 +155,6 @@ def test_snes_has_six_buttons(win):
     assert control_window.buttons_for(win.controller.project.system.name) == 6
 
 
-def test_the_window_does_not_open_in_add_mode(win):
-    win.controller.start_add_mode()
-    win.show_control_window()
-    assert win.control_window is None or not win.control_window.isVisible()
-    win.controller.cancel_add_mode()
-
-
 def test_export_rules_menu_writes_text_or_json(win, tmp_path, monkeypatch):
     out_txt, out_json = tmp_path / "r.txt", tmp_path / "r.json"
     monkeypatch.setattr(QFileDialog, "getSaveFileName", staticmethod(lambda *a, **k: (str(out_txt), "")))

@@ -1,4 +1,4 @@
-"""The palette keeps unused colours, Delete colour, and the "add new colour" mode (v2.0.8)."""
+"""The palette keeps unused colours, Delete colour, and + colour (v2.0.8; adds at once since v2.0.16)."""
 import os
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -162,86 +162,66 @@ def pal(w):
     return w.panels["Palette panel"]
 
 
-def test_add_mode_locks_everything_and_arms_the_pipette(win):
-    c = win.controller
-    ed(win).add_btn.click()
-    assert c.add_mode
-    assert ed(win).eyedropper_armed and ed(win).apply_btn.isEnabled()
-    assert pal(win).grid.add_slot == len(c.project.palette())
-    assert not win.panels["Timeline and frames"].isEnabled()
-    assert not win.panels["Set Frame Group"].isEnabled()
-    assert not win.act_save.isEnabled()
-    assert not ed(win).t_box.isEnabled()
+def set_primary(w, colour):
+    """Make `colour` the primary colour with the Colour editor's sliders (Atari ST: 3 bits a channel)."""
+    e = ed(w)
+    if e.current != "primary":
+        e._pair_clicked("primary")
+    for s, v in zip(e.sliders, colour):
+        s.setValue(round(v * 7 / 255))
 
 
-def test_escape_cancels(win):
-    c = win.controller
-    ed(win).add_btn.click()
-    QTest.keyClick(win, Qt.Key_Escape)
-    assert not c.add_mode and not ed(win).apply_btn.isEnabled()
-    assert win.panels["Timeline and frames"].isEnabled() and win.act_save.isEnabled()
-    assert pal(win).grid.add_slot is None
-
-
-def test_apply_adds_to_the_next_free_slot_and_ends_the_mode(win):
+def test_plus_adds_the_primary_colour_to_the_next_free_slot_at_once(win):
     c = win.controller
     p = c.project
     n = len(p.palette())
+    set_primary(win, YELLOW)
     ed(win).add_btn.click()
-    ed(win).sliders[0].setValue(7)
-    ed(win).sliders[1].setValue(7)                      # yellow
-    ed(win).apply_btn.click()
-    assert not c.add_mode
     assert p.palette()[n] == YELLOW and len(p.palette()) == n + 1
+    assert not hasattr(ed(win), "apply_btn") and not hasattr(c, "add_mode")      # no Apply step, nothing locked
+    assert win.panels["Timeline and frames"].isEnabled() and win.act_save.isEnabled()
+    assert ed(win).cols["primary"] == YELLOW
     c.undo()
     assert YELLOW not in p.palette()                    # one Undo step (outside Edit mode)
 
 
-def test_apply_of_a_colour_already_in_the_palette_shows_the_error(win, log):
+def test_plus_with_a_colour_already_in_the_palette_says_so(win, log):
     c = win.controller
+    set_primary(win, RED)                               # already there
     ed(win).add_btn.click()
-    ed(win).sliders[0].setValue(7)
-    ed(win).sliders[1].setValue(0)
-    ed(win).sliders[2].setValue(0)                      # red: already there
-    ed(win).apply_btn.click()
-    assert c.add_mode and log["warn"] and "already in the palette" in log["warn"][-1][0]
+    assert log["warn"] and log["warn"][-1][0] == "That colour is already in the palette."
     assert len(c.project.palette()) == 4
 
 
-def test_palette_squares_do_nothing_while_adding(win):
-    c = win.controller
+def test_plus_on_a_full_palette_says_so(win, log):
+    p = win.controller.project
+    p.extra_colours = [(i % 4 * 85, i // 4 % 4 * 85, i // 16 * 85) for i in range(15)] + [BLACK]
+    win.controller.frames_changed.emit()
+    assert len(p.palette()) == 16
+    assert ed(win).add_btn.isEnabled()                  # still clickable: the click explains
+    set_primary(win, YELLOW)
     ed(win).add_btn.click()
-    g = pal(win).grid
-    before = ed(win).colour
-    QTest.mouseClick(g, Qt.LeftButton, Qt.NoModifier, g.slot_rect(1).center())
-    assert ed(win).colour == before and c.add_mode
+    assert log["warn"][-1] == ("The palette is full.", "Delete a colour or reduce the palette first.")
+    assert len(p.palette()) == 16
 
 
-def test_the_button_is_off_for_fixed_systems_and_full_palettes(app, log):
+def test_the_button_is_off_for_fixed_systems(app, log):
     w = MainWindow()
     w.show()
     w.set_project(make("Commodore 64"))
     assert not ed(w).add_btn.isEnabled()
     w.set_project(make("Atari ST"))
     assert ed(w).add_btn.isEnabled()
-    p = w.controller.project
-    p.extra_colours = [(i % 4 * 85, i // 4 % 4 * 85, i // 16 * 85) for i in range(16)]
-    w.controller.frames_changed.emit()
-    assert not ed(w).add_btn.isEnabled()
 
 
-def test_edit_mode_plus_colour_button_starts_the_same_mode(win):
+def test_edit_mode_plus_colour_button_adds_at_once(win):
     c = win.controller
     c.edit.begin()
     keys = win.panels["Keys"]
+    set_primary(win, YELLOW)
     keys.tool_buttons["plus"].click()
-    assert c.add_mode and keys.tool_buttons["plus"].selected
-    assert not keys.tool_buttons["pencil"].isEnabled()
-    ed(win).sliders[0].setValue(7)
-    ed(win).sliders[1].setValue(7)
-    ed(win).apply_btn.click()
-    assert not c.add_mode and c.edit.tool == "pencil" and YELLOW in c.project.palette()
-    assert keys.tool_buttons["pencil"].isEnabled()
+    assert YELLOW in c.project.palette() and c.edit.tool == "pencil" and keys.tool_buttons["pencil"].isEnabled()
+    assert not keys.tool_buttons["plus"].selected
 
 
 # ---- the right-click menu and Reduce Palette -------------------------------------------------------

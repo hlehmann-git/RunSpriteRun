@@ -13,6 +13,10 @@ from src.core.runner import Runner
 from src.io import settings as settings_io
 
 
+MSG_PALETTE_FULL = ("The palette is full.", "Delete a colour or reduce the palette first.")
+MSG_ALREADY_IN_PALETTE = ("That colour is already in the palette.", "Choose a different primary colour first.")
+
+
 class Controller(QObject):
     project_changed = Signal()        # a different project is open (or none)
     selection_changed = Signal(int)   # the selected frame (0-based)
@@ -28,7 +32,6 @@ class Controller(QObject):
     frame_pixel_clicked = Signal(tuple)  # a pixel of the Frame view was clicked: its colour
     palette_right_clicked = Signal(int)  # right click on a palette square (0-based slot)
     frame_pixel_right_clicked = Signal(tuple)  # right click on a pixel of the Frame view: its colour
-    add_mode_changed = Signal(bool)   # the "add new colour" mode started or ended
 
     def __init__(self, parent_widget: QWidget | None = None, settings: settings_io.Settings | None = None) -> None:
         super().__init__()
@@ -41,14 +44,12 @@ class Controller(QObject):
         self.history = history.History()
         self.edit = EditSession(self)
         self.eyedropper_armed = False      # set by the Colour editor
-        self.add_mode = False              # the "add new colour" mode: everything else is locked until Apply or Esc
         self.clipboard_frames: list[Frame] = []      # Ctrl+C in the Timeline: the frames as they were when copied
         self.timer = QTimer(self)
         self.timer.timeout.connect(self._tick)
         self.frames_changed.connect(self._frames_changed)
         self.selection_changed.connect(self._selection_changed)
         self.project_changed.connect(self.drop_frame_clipboard)
-        self.project_changed.connect(self.cancel_add_mode)
 
     def set_project(self, project: Project | None) -> None:
         self.stop_run()
@@ -415,43 +416,34 @@ class Controller(QObject):
         settings_io.save(new)
         self.settings_changed.emit()
 
-    # ---- add new colour mode ---------------------------------------------------------------------
+    # ---- + colour -------------------------------------------------------------------------------
     def add_colour_blocked(self) -> str | None:
-        """None if a new colour can be added now, otherwise the reason it can't."""
+        """None if the + colour button can be used, otherwise why it is greyed out (no project, or fixed colours).
+        A full palette is not a reason to grey it out: the button then says why it cannot add."""
         p = self.project
         if p is None:
             return "No project is open"
         if p.system.is_fixed:
             return "The colours of this system are fixed"
-        if len(p.palette()) >= p.system.max_colours:
-            return "The palette is full"
-        if self.edit.mode and self.edit.floating is not None:
-            return "Press Enter to fix the paste or Esc to discard it first."
         return None
 
-    def start_add_mode(self) -> bool:
-        if self.add_mode:
-            return True
+    def add_primary_colour(self) -> tuple[str, str] | None:
+        """+ colour: add the primary colour to the next free palette slot straight away (one Undo step). Returns
+        None when it was added, otherwise the message to show (text and detail) and nothing changes."""
+        p = self.project
         reason = self.add_colour_blocked()
         if reason is not None:
-            if self.edit.mode:
-                self.edit.notice.emit(reason)
-            return False
-        self.stop_run()
-        self.add_mode = True
-        self.add_mode_changed.emit(True)
-        return True
-
-    def cancel_add_mode(self) -> None:
-        if self.add_mode:
-            self.add_mode = False
-            self.add_mode_changed.emit(False)
-
-    def toggle_add_mode(self) -> None:
-        if self.add_mode:
-            self.cancel_add_mode()
-        else:
-            self.start_add_mode()
+            return reason + ".", None
+        if len(p.palette()) >= p.system.max_colours:
+            return MSG_PALETTE_FULL
+        if self.edit.mode and self.edit.floating is not None:
+            return "Press Enter to fix the paste or Esc to discard it first.", None
+        colour = p.system.snap(self.edit.active)
+        if colour in p.palette():
+            return MSG_ALREADY_IN_PALETTE
+        self.edit.editor_colour = colour
+        self.edit.add_colour()                          # the Pencil with the new colour is ready (in Edit mode)
+        return None
 
     # ---- palette (FR-3.13) ---------------------------------------------------------------------
     def delete_colour_blocked(self, slot: int) -> str | None:
@@ -475,6 +467,26 @@ class Controller(QObject):
         p = self.project
         before = self.checkpoint()
         editing.delete_colour(p, p.palette()[slot])
+        self.commit(before)
+        self.frames_changed.emit()
+        return True
+
+    def move_colour(self, from_slot: int, to_slot: int) -> bool:
+        """Move a palette colour to another slot; the colours between move along one place. Only the order changes,
+        never a pixel. One Undo step (outside Edit mode)."""
+        p = self.project
+        if p is None:
+            return False
+        colours = p.palette()
+        if not (0 <= from_slot < len(colours) and 0 <= to_slot < len(colours)) or from_slot == to_slot:
+            return False
+        if self.edit.mode and self.edit.floating is not None:
+            self.edit.notice.emit("Press Enter to fix the paste or Esc to discard it first.")
+            return False
+        before = self.checkpoint()
+        colour = colours.pop(from_slot)
+        colours.insert(to_slot, colour)
+        p.extra_colours = colours
         self.commit(before)
         self.frames_changed.emit()
         return True

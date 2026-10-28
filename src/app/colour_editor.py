@@ -8,7 +8,7 @@ from PySide6.QtWidgets import QAbstractButton, QFrame, QLabel, QLineEdit, QPushB
 
 from src.app import messages
 from src.app.controller import Controller
-from src.app.edit_panel import IconButton
+from src.app.edit_panel import IconButton, add_primary_colour
 from src.app.panel import Panel
 from src.app.pixel_icons import SIZE, eyedropper
 from src.app.theme import TOGGLE_BUTTON_STYLE
@@ -242,12 +242,6 @@ class ColourEditorPanel(Panel):
         hex_label.setGeometry(160, 106, 28, 24)
         self.hex = QLineEdit(self)
         self.hex.setGeometry(192, 106, 88, 24)
-        self.apply_btn = QPushButton("Apply", self)               # "add new colour" mode: adds the colour to the free square
-        self.apply_btn.setGeometry(284, 106, 40, 24)
-        self.apply_btn.setFocusPolicy(Qt.NoFocus)
-        self.apply_btn.setToolTip("Add this colour to the palette (only while adding a new colour)")
-        self.apply_btn.setEnabled(False)
-        self.apply_btn.clicked.connect(self._apply_clicked)
         self.hex.setMaxLength(7)
         self.hex.editingFinished.connect(self._hex_finished)
 
@@ -268,7 +262,7 @@ class ColourEditorPanel(Panel):
         self.preview.clicked.connect(self._pair_clicked)
         self.add_btn = IconButton("plus", self)                  # the same button as + colour in the Edit panel
         self.add_btn.move(208, 158)
-        self.add_btn.clicked.connect(self.controller.toggle_add_mode)
+        self.add_btn.clicked.connect(self._add_clicked)
         self.eyedropper = EyedropperButton(self)
         self.eyedropper.move(288, 158)
         self.eyedropper.clicked.connect(self._toggle_eyedropper)
@@ -276,7 +270,6 @@ class ColourEditorPanel(Panel):
         controller.project_changed.connect(self._project_changed)
         controller.project_changed.connect(self._refresh_add_btn)
         controller.frames_changed.connect(self._refresh_add_btn)
-        controller.add_mode_changed.connect(self._add_mode_changed)
         controller.frames_changed.connect(self._refresh_transparent)
         controller.edit.colour_added.connect(self._colour_added)
         controller.palette_clicked.connect(lambda slot: self._palette_clicked(slot, "primary"))
@@ -318,30 +311,11 @@ class ColourEditorPanel(Panel):
 
     def _refresh_add_btn(self) -> None:
         reason = self.controller.add_colour_blocked()
-        self.add_btn.setEnabled(reason is None or self.controller.add_mode)
-        self.add_btn.setToolTip("Add a new colour to the palette (Esc cancels)" if reason is None else reason)
+        self.add_btn.setEnabled(reason is None)
+        self.add_btn.setToolTip("Add the primary colour to the next free palette slot" if reason is None else reason)
 
-    def _add_mode_changed(self, on: bool) -> None:
-        """The "add new colour" mode: the pipette is armed, the T box and palette squares do nothing, and Apply is the
-        only way to add the colour. Esc (handled by the window) or the + button again cancels."""
-        self.add_btn.selected = on
-        self.add_btn.update()
-        self.apply_btn.setEnabled(on)
-        self.t_box.setEnabled(not on)
-        self._arm("eyedropper" if on else None)
-        if not on:
-            self._refresh_add_btn()
-
-    def _apply_clicked(self) -> None:
-        c = self.controller
-        p = c.project
-        if p is None or not c.add_mode:
-            return
-        if p.system.snap(self.colour) in p.palette():
-            messages.warn(self.window(), "That colour is already in the palette.", "Choose a different colour.")
-            return                                       # still adding: back to choosing
-        c.edit.add_colour()                              # the Pencil with the new colour is ready (in Edit mode)
-        c.cancel_add_mode()                              # done: back to normal
+    def _add_clicked(self) -> None:
+        add_primary_colour(self.window(), self.controller)
 
     def _refresh_transparent(self) -> None:
         p = self.controller.project
@@ -387,8 +361,6 @@ class ColourEditorPanel(Panel):
         self.preview.set_state(self.cols["primary"], self.cols["secondary"], self.current, self.armed)
 
     def _arm(self, which: str | None) -> None:
-        if self.controller.add_mode and which in ("preview", "transparent"):
-            which = "eyedropper" if self.eyedropper_armed else None      # adding a colour: nothing is overwritten
         if which == "preview" and getattr(self, "locked", False):
             which = None                                     # nothing to overwrite: the colours are fixed
         self.armed = which == "preview"
@@ -450,8 +422,8 @@ class ColourEditorPanel(Panel):
     # ---- clicks elsewhere ---------------------------------------------------------------------------
     def _palette_clicked(self, slot: int, which: str = "primary") -> None:
         p = self.controller.project
-        if p is None or self.controller.add_mode:
-            return                                      # adding a new colour: the palette squares do nothing
+        if p is None:
+            return
         colours = p.palette()
         if not 0 <= slot < len(colours):
             return                                      # a free slot does nothing
@@ -488,3 +460,4 @@ class ColourEditorPanel(Panel):
         if self.eyedropper_armed:
             self._hint = None
             self._set_colour(tuple(colour), arm=True, which=which)
+

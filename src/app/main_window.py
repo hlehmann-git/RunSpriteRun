@@ -105,8 +105,6 @@ class MainWindow(QMainWindow):
         self.control_window = None                                # the Frame Group Control window, made when first opened
         self.controller.frames_changed.connect(self._update_group_actions)
         self.controller.history_changed.connect(self._update_edit_actions)
-        self._add_locked_actions: list = []
-        self.controller.add_mode_changed.connect(self._lock_for_add)
         self.controller.edit.changed.connect(self._edit_mode_changed)
         self.controller.frames_changed.connect(self._update_save_action)
         self.controller.history_changed.connect(self._update_save_action)
@@ -203,25 +201,8 @@ class MainWindow(QMainWindow):
         self.act_about.triggered.connect(lambda: AboutDialog(self).exec())
 
     # ---- RunSpriteRun: Esc and the keys -----------------------------------------------------------------
-    def _lock_for_add(self, on: bool) -> None:
-        """The "add new colour" mode: the menus, the timeline, the group panel and the run and preview windows are
-        switched off. The Frame view stays on for the pipette, and the Edit panel and Colour editor lock themselves."""
-        if on:
-            self._add_locked_actions = [a for m in (self.menu_file, self.menu_edit, self.menu_group, self.menu_help, self.menu_about)
-                                        for a in m.actions() if a.isEnabled()]
-            for a in self._add_locked_actions:
-                a.setEnabled(False)
-        else:
-            for a in self._add_locked_actions:
-                a.setEnabled(True)
-            self._add_locked_actions = []
-            self._update_edit_actions()
-            self._update_group_actions()
-        for name in ("Timeline and frames", "Set Frame Group", "RunSpriteRun window", "Frame Group Preview"):
-            self.panels[name].setEnabled(not on)
-
     def toggle_run(self) -> None:
-        if self.controller.project is None or self.controller.add_mode:
+        if self.controller.project is None:
             return
         if not self.controller.running:
             self._clear_text_focus()                       # keys only work when no text box has focus
@@ -239,7 +220,7 @@ class MainWindow(QMainWindow):
 
     def eventFilter(self, obj, event) -> bool:
         t = event.type()
-        if (t in (QEvent.KeyPress, QEvent.KeyRelease) and event.key() in RUN_KEYS and not self.controller.add_mode
+        if (t in (QEvent.KeyPress, QEvent.KeyRelease) and event.key() in RUN_KEYS
                 and not self.controller.edit.mode):              # in Edit mode S is the Select tool, not a RunSpriteRun key
             if event.modifiers() & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier):
                 return False
@@ -256,12 +237,8 @@ class MainWindow(QMainWindow):
                 if not event.isAutoRepeat() and self.controller.start_with_key(key):
                     return True                           # a key with a group starts RunSpriteRun
         elif (t == QEvent.KeyPress and event.key() == Qt.Key_Escape and self.controller.running
-              and not self.controller.add_mode and QApplication.activeModalWidget() is None and self.isActiveWindow()):
+              and QApplication.activeModalWidget() is None and self.isActiveWindow()):
             self.controller.stop_run()                        # Esc stops RunSpriteRun and returns to the start state
-            return True
-        elif (t == QEvent.KeyPress and self.controller.add_mode and event.key() == Qt.Key_Escape
-              and QApplication.activeModalWidget() is None):
-            self.controller.cancel_add_mode()                 # Esc cancels adding a new colour
             return True
         elif t == QEvent.KeyPress and self.controller.edit.mode and self._edit_key(event):
             return True
@@ -271,8 +248,7 @@ class MainWindow(QMainWindow):
 
     def _edit_key(self, event) -> bool:
         """Keys of the Select tool in Edit mode: Ctrl+A, C, X, V, Delete, Enter (fix a paste), Esc (discard), arrows."""
-        if (not self.isActiveWindow() or QApplication.activeModalWidget() is not None or self._text_focus()
-                or self.controller.add_mode):
+        if not self.isActiveWindow() or QApplication.activeModalWidget() is not None or self._text_focus():
             return False
         e = self.controller.edit
         key, mods = event.key(), event.modifiers()
@@ -428,7 +404,7 @@ class MainWindow(QMainWindow):
 
     def show_control_window(self) -> None:
         """Set Rules / Group > Frame Group Control: the pop-up that says which keys play which frame group."""
-        if self.controller.project is None or self._editing() or self.controller.add_mode:
+        if self.controller.project is None or self._editing():
             return
         if self.control_window is None:
             from src.app.control_window import ControlWindow
