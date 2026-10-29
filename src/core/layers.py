@@ -34,6 +34,17 @@ def flatten(layers, transparent: Colour, visible=(True, True, True)) -> Image.Im
     return out
 
 
+def flatten_subset(images: dict, size: tuple[int, int], transparent: Colour) -> Image.Image:
+    """Like flatten(), but for a {layer index: image} dict that may not have all three layers (what Copy/Cut
+    took from the layers that were ticked at the time). Missing layers stay transparent."""
+    out = blank(size, transparent)
+    for i in (BG, CORE, FG):
+        im = images.get(i)
+        if im is not None:
+            out.paste(im, mask=opaque_mask(im, transparent))
+    return out
+
+
 def layers_of(frame, transparent: Colour):
     """The three layer images of a frame. A frame that was never edited has everything on Core."""
     if frame.layers is not None:

@@ -62,6 +62,11 @@ class FrameViewPanel(Panel):
             b.setToolTip(tip)
             b.hide()
         self.zoom_label.hide()
+        # shown only once actually zoomed in past Fit, so panning is possible
+        self.pan_hint = QLabel("Hold Space and Left Click to pan", self)
+        self.pan_hint.setStyleSheet("font-size: 11px; color: #9aa0ae; background: transparent;")
+        self.pan_hint.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self.pan_hint.hide()
         self.zoom_out.clicked.connect(lambda: self.view.set_scale(self.view.current_scale() - 1))
         self.zoom_in.clicked.connect(lambda: self.view.set_scale(self.view.current_scale() + 1))
         self.view.zoom_changed.connect(self._zoom_changed)
@@ -83,6 +88,8 @@ class FrameViewPanel(Panel):
         self.zoom_label.setGeometry(300, y - 1, 100, 24)
         self.zoom_out.move(408, y)
         self.zoom_in.move(436, y)
+        panel_w = 544 if large else 288
+        self.pan_hint.setGeometry(panel_w - 16 - 230, 8, 230, 26)
         self.view.update()
 
     def _zoom_changed(self) -> None:
@@ -91,6 +98,7 @@ class FrameViewPanel(Panel):
         self.zoom_label.setText(f"Zoom {n}x" + ("  (fit)" if n == v.fit() else ""))
         self.zoom_out.setEnabled(n > v.fit())
         self.zoom_in.setEnabled(n < 64)
+        self.pan_hint.setVisible(v.navigable and n > v.fit())
 
     def _grid_setting(self) -> None:
         self.view.grid = self.controller.settings.grid

@@ -55,7 +55,8 @@ class EditSession(QObject):
         self.selection: tuple | None = None        # the selected rectangle (x0, y0, x1, y1), x1 and y1 not included
         self.sel_idx = -1                          # the frame it belongs to
         self.floating: dict | None = None          # a pasted piece that is not fixed in place yet
-        self.clipboard: dict | None = None         # what Copy and Cut took: {"w", "h", "layers": {layer: image}}
+        self.clipboard: dict | None = None         # what Copy and Cut took: {"w", "h", "image"} - the ticked
+                                                    # layers flattened into one picture, not kept apart
         controller.selection_changed.connect(self.frame_selected)
         self.mirror: dict[str, int | None] = {"v": None, "h": None}   # guide lines, in half pixels from the frame's left / top
         self.mirror_armed: str | None = None       # "v" or "h": the next left click in the Frame view places that line
@@ -539,7 +540,10 @@ class EditSession(QObject):
         p = c.project
         base = L.layers_of(p.frames[c.selected], p.transparent)
         r = self.selection
-        self.clipboard = {"w": r[2] - r[0], "h": r[3] - r[1], "layers": editing.crop_layers(base, targets, r)}
+        w, h = r[2] - r[0], r[3] - r[1]
+        cropped = editing.crop_layers(base, targets, r)
+        flat = L.flatten_subset(cropped, (w, h), p.transparent)
+        self.clipboard = {"w": w, "h": h, "image": flat}
         self.changed.emit()
         return True
 
@@ -589,9 +593,12 @@ class EditSession(QObject):
         if c.selected != self.idx:
             self.notice.emit(MSG_VIEW_ONLY)
             return False
+        targets = self._selection_targets()        # paste goes onto whatever layers are ticked NOW, not where
+        if not targets:                             # it was copied from
+            return False
         f = p.frames[self.idx]
         clip = self.clipboard
-        self.floating = {"layers": dict(clip["layers"]), "w": clip["w"], "h": clip["h"], "x": 0, "y": 0,
+        self.floating = {"clip": clip["image"], "targets": targets, "w": clip["w"], "h": clip["h"], "x": 0, "y": 0,
                          "base": L.layers_of(f, p.transparent), "image": f.image, "frame_layers": f.layers}
         self.sel_idx = self.idx
         self._render_floating()
@@ -602,7 +609,8 @@ class EditSession(QObject):
     def _render_floating(self) -> None:
         fl = self.floating
         p = self.controller.project
-        new = editing.paste_layers(fl["base"], fl["layers"], fl["x"], fl["y"], p.transparent)
+        clip = {i: fl["clip"] for i in fl["targets"]}      # the same flattened picture onto every ticked layer
+        new = editing.paste_layers(fl["base"], clip, fl["x"], fl["y"], p.transparent)
         editing.set_frame_layers(p, self.idx, new)
         self.selection = self._cut_to_frame(self._float_rect())
         self.frame_edited.emit(self.idx)
@@ -677,16 +685,7 @@ class EditSession(QObject):
         self._redo = [remap_step(s) for s in self._redo]
         if self.clipboard is None:
             return
-        out = {}
-        for i, im in self.clipboard["layers"].items():
-            im = im.copy()
-            px = im.load()
-            for y in range(im.height):
-                for x in range(im.width):
-                    if px[x, y] == old:
-                        px[x, y] = new
-            out[i] = im
-        self.clipboard = dict(self.clipboard, layers=out)
+        self.clipboard = dict(self.clipboard, image=palette.remap_image(self.clipboard["image"], old, new))
 
     # ---- actions: flip, mirror, rotate ---------------------------------------------------------------
     def can_rotate(self) -> bool:
@@ -723,7 +722,7 @@ class EditSession(QObject):
                   "rotate_right": Image.ROTATE_270}[name]
         if self.floating is not None:                         # a floating paste is turned as it is
             fl = self.floating
-            fl["layers"] = {i: im.transpose(img_fn) for i, im in fl["layers"].items()}
+            fl["clip"] = fl["clip"].transpose(img_fn)
             self._render_floating()
             self.changed.emit()
             return True

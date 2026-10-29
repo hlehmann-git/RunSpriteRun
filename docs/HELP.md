@@ -384,11 +384,11 @@ Rotate and flip act on the ticked layers, or on the selection or pasted piece if
 
 ### Selecting, copying and pasting
 
-With the Select tool, drag a rectangle (dotted outline). **Ctrl+A** selects all, **Ctrl+C** copies, **Ctrl+X** cuts, **Ctrl+V** pastes and **Delete** clears. Paste lands at the top left as a floating piece that you can drag or nudge with the arrow keys; press **Enter** to fix it in place or **Esc** to discard it. The transparent colour is see-through when pasting. You can select and copy on a frame you are only viewing, to bring a piece from one frame to another.
+With the Select tool, drag a rectangle (dotted outline). **Ctrl+A** selects all, **Ctrl+C** copies, **Ctrl+X** cuts, **Ctrl+V** pastes and **Delete** clears; each of these buttons flashes blue when clicked to confirm it registered. Copy and Cut flatten whichever layers are ticked at the time into one picture; Paste puts that picture onto whichever layers are ticked when you paste, even if that's different layers than you copied from. Paste lands at the top left as a floating piece that you can drag or nudge with the arrow keys; press **Enter** to fix it in place or **Esc** to discard it. The transparent colour is see-through when pasting. You can select and copy on a frame you are only viewing, to bring a piece from one frame to another.
 
 ### Zoom and pan
 
-The mouse wheel zooms around the pointer, and the - and + buttons by the frame arrows do the same, from fit up to 64x. Hold **Space** and drag, or drag with the middle mouse button, to pan. The zoom stays when you step between frames.
+The mouse wheel zooms around the pointer, and the - and + buttons by the frame arrows do the same, from fit up to 64x. Hold **Space** and drag, or drag with the middle mouse button, to pan. Once you're zoomed in past Fit, a reminder of this ("Hold Space and Left Click to pan") appears at the top right of the Frame view. The zoom stays when you step between frames.
 
 ## 8. The Edit menu: Undo, Shrink Sprite and Reduce Palette
 

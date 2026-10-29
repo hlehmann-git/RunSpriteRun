@@ -41,6 +41,9 @@ SMALL_BTN = ("QPushButton { background: #1e2025; border: 1px solid #555964; bord
 SEG2_STYLE = ("QPushButton { background: #1e2025; border: 1px solid #555964; border-radius: 4px; padding: 0 8px; }"
               "QPushButton:checked { background: #3780cd; border: 1px solid #78b9ff; color: white; font-weight: bold; }"
               "QPushButton:disabled { color: #70737c; }")
+FLASH_STYLE = ("QPushButton { background: #4da3ff; border: 1px solid #78b9ff; color: white; border-radius: 4px;"
+               " padding: 0 8px; }")
+FLASH_MS = 150          # how long the Select/Deselect/Cut/Copy/Paste/Delete buttons flash blue when clicked
 
 
 def _pix(name: str) -> QPixmap:
@@ -361,10 +364,21 @@ class EditPanel(Panel):
             b.setStyleSheet(SEG2_STYLE)
             b.setFocusPolicy(Qt.NoFocus)
             b.setToolTip(f"{text} ({keys})")
-            b.clicked.connect(lambda _c=False, fn=fn: fn())
+            b.clicked.connect(lambda _c=False, fn=fn, b=b: (self._flash(b), fn()))
             self.select_btns[key] = b
         self._y += 3 * 28 + 4
         self._refresh_select_buttons()
+
+    def _flash(self, btn: QPushButton) -> None:
+        """A brief blue flash confirms the click: these buttons often change nothing visible (Copy, a no-op Cut)."""
+        btn.setStyleSheet(FLASH_STYLE)
+        QTimer.singleShot(FLASH_MS, lambda: self._unflash(btn))
+
+    def _unflash(self, btn: QPushButton) -> None:
+        try:
+            btn.setStyleSheet(SEG2_STYLE)
+        except RuntimeError:
+            pass                                      # the button was deleted with an old Options page
 
     def _refresh_select_buttons(self) -> None:
         btns = getattr(self, "select_btns", None)

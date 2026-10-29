@@ -765,7 +765,7 @@ def test_copied_pixels_follow_a_replaced_palette_colour(win):
     p = c.project
     slot = p.palette().index(RED)
     assert c.replace_colour(slot, (0, 255, 0))
-    assert (0, 255, 0) in [px for im in e.clipboard["layers"].values() for px in im.get_flattened_data()]
+    assert (0, 255, 0) in list(e.clipboard["image"].get_flattened_data())
 
 
 def test_select_options_buttons_follow_the_state(win):
