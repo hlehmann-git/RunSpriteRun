@@ -411,9 +411,6 @@ class ControlWindow(QDialog):
         if p is None or self._problems():
             return
         rules = copy.deepcopy(self.d_rules)
-        for r in rules:
-            if any(k in ACTION_KEYS for k in r.keys):
-                r.once = True                                      # an action key plays its group once
         if self.controller.set_rules_and_transitions(rules, copy.deepcopy(self.d_trans), copy.deepcopy(self.d_keys)):
             self.accept()
 
@@ -573,10 +570,9 @@ class ControlWindow(QDialog):
         a.addWidget(grp)
         mode = QComboBox()
         mode.addItems(["Loop", "Once"])
-        mode.setCurrentIndex(1 if (r.once or is_action) else 0)
-        mode.setEnabled(not is_action)
+        mode.setCurrentIndex(1 if r.once else 0)
         if is_action:
-            mode.setToolTip("An action key plays its group once")
+            mode.setToolTip("Once: the group plays through one time. Loop: it keeps playing while the key is held.")
         mode.currentIndexChanged.connect(lambda _x, i=i, c=mode: self._edit(i, once=c.currentIndex() == 1))
         a.addWidget(mode)
         if not is_action:

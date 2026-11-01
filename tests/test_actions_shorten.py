@@ -140,3 +140,29 @@ def test_an_older_or_damaged_file_cannot_combine_an_action_key_with_others(tmp_p
                 data = json.dumps(d).encode()
             zout.writestr(item, data)
     assert open_project(out).control_rules == []                  # the damaged rule is dropped, never the project
+
+
+def test_an_action_key_set_to_loop_keeps_playing_while_it_is_held():
+    """Loop on an action rule: the group animates for as long as the key is down, instead of stopping at the end."""
+    p = make()
+    p.control_rules = [ControlRule(["7"], "Die", False)]          # once=False: Loop
+    r = Runner(p)
+    r.start()
+    r.press("7")
+    assert r.playing_group == "Die" and r.animating
+    for _ in range(9):                                            # well past one time through the group (frames 3-5)
+        r.tick()
+    assert r.playing_group == "Die" and r.animating                # still looping, not stopped on the last frame
+    r.release("7")
+    assert r.frame == 5                                            # the release default: stay on the group's last frame
+
+
+def test_an_action_key_left_on_once_still_plays_through_one_time():
+    p = make()
+    p.control_rules = [ControlRule(["7"], "Die", True)]            # once=True: unchanged behaviour
+    r = Runner(p)
+    r.start()
+    r.press("7")
+    for _ in range(9):
+        r.tick()
+    assert r.frame == 5 and not r.animating                        # stopped on the last frame of Die

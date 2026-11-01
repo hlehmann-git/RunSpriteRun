@@ -228,14 +228,23 @@ def _action_win(win):
     return _open(win)
 
 
-def test_an_action_rule_plays_once_and_offers_only_its_own_frames(win):
+def test_an_action_rule_can_be_looped_and_offers_only_its_own_frames(win):
     cw = _action_win(win)
     rc = [c for c in cw.findChildren(control_window.ReleaseChoice)][0]
     texts = [rc.itemText(i) for i in range(rc.count())]
     assert texts[0] == "Stay on last frame" and len(texts) == 1 + 2         # the two frames of Shoot, no groups
     row = rows(win)[0]
     assert "only if in" not in [l.text() for l in row.findChildren(control_window.QLabel)]
-    assert not [c for c in row.findChildren(control_window.QComboBox) if c.currentText() == "Once"][0].isEnabled()
+    mode = [c for c in row.findChildren(control_window.QComboBox) if c.currentText() == "Once"][0]
+    assert mode.isEnabled()                      # Once to start with, but Loop can now be chosen as well
+
+
+def test_an_action_rule_set_to_loop_is_not_forced_back_to_once(win):
+    cw = _action_win(win)
+    cw._edit(0, once=False)                      # Loop
+    cw._apply()
+    r = win.controller.project.control_rules[0]
+    assert r.keys == ["7"] and not r.once
 
 
 def test_a_group_used_by_both_sides_marks_the_rows_red_and_blocks_apply(win):
