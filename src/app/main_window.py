@@ -55,10 +55,10 @@ REGIONS = [
     ("Frame Group Preview", 320, 44, 288, 324),
     ("RunSpriteRun window", 624, 44, 288, 324),
     ("Palette panel", 928, 44, 336, 70),       # card top half; taller for 32 or 64 slots (placed in code)
-    ("Set Frame Group", 16, 384, 544, 208),
-    ("Keys", 576, 384, 688, 208),
+    ("Set Frame Group", 16, 384, 544, 264),
+    ("Keys", 576, 384, 688, 264),
     ("Colour editor", 928, 114, 336, 204),    # card bottom half, directly under the palette
-    ("Timeline and frames", 16, 608, 1248, 234),
+    ("Timeline and frames", 16, 664, 1248, 234),
 ]
 
 
@@ -102,6 +102,7 @@ class MainWindow(QMainWindow):
         self.set_frame_group = self.panels["Set Frame Group"]
         self.set_frame_group.current_group_changed.connect(lambda _name: self._update_group_actions())
         self.set_frame_group.set_rules_requested.connect(self.show_control_window)
+        self.panels["Timeline and frames"].new_group_requested.connect(self.set_frame_group.new_group)
         self.control_window = None                                # the Frame Group Control window, made when first opened
         self.controller.frames_changed.connect(self._update_group_actions)
         self.controller.history_changed.connect(self._update_edit_actions)
@@ -133,7 +134,7 @@ class MainWindow(QMainWindow):
         if large:
             g("Frame view", 16, 44, 544, EDIT_FRAME_H)
             g("Frame Group Preview", 576, 44, 288, 324)
-            g("Timeline and frames", 16, 44 + EDIT_FRAME_H + 16, 1248, 234)
+            g("Timeline and frames", 16, 664, 1248, 234)
         else:
             for name, x, y, w, h in REGIONS:
                 if name in ("Frame view", "Frame Group Preview", "Timeline and frames"):

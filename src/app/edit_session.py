@@ -39,8 +39,8 @@ class EditSession(QObject):
         self.mode = False
         self.tool = "pencil"
         self.options = {k: dict(v) for k, v in DEFAULT_OPTIONS.items()}
-        self.visible = [True, True, True]          # ForeGround, Core, BackGround
-        self.target = [False, True, False]         # layers an edit changes (Core to start with)
+        self.visible = [True] * L.COUNT        # ForeGround 2 and 1, Core, BackGround 1 and 2
+        self.target = [i == L.CORE for i in range(L.COUNT)]   # layers an edit changes (Core to start with)
         self.active: Colour | None = None          # the primary colour
         self.secondary: Colour | None = None       # the secondary colour (the fill of Outline + Fill shapes)
         self.idx = -1                              # the frame being edited
@@ -243,7 +243,7 @@ class EditSession(QObject):
 
     def editable(self) -> list[int]:
         """Layers an edit changes: ticked as a target and visible (a hidden layer cannot be drawn on)."""
-        return [i for i in range(3) if self.visible[i] and self.target[i]]
+        return [i for i in range(L.COUNT) if self.visible[i] and self.target[i]]
 
     def set_active(self, colour: Colour | None) -> None:
         self.active = tuple(colour) if colour is not None else None

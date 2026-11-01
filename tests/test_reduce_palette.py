@@ -59,9 +59,11 @@ def test_same_answer_every_time_and_range_checked():
 
 
 def test_layers_are_reduced_and_transparent_kept():
+    from src.core.layers import CORE, LAYER_NAMES
     p = make()
     im = p.frames[0].image
-    p.frames[0].layers = (im, Image.new("RGB", (8, 8), (0, 0, 0)), Image.new("RGB", (8, 8), (0, 0, 0)))
+    empty = Image.new("RGB", (8, 8), (0, 0, 0))
+    p.frames[0].layers = tuple(im if i == CORE else empty.copy() for i in range(len(LAYER_NAMES)))
     reduce_project(p, 2)
     assert RED2 not in p.palette() and (0, 0, 0) in p.palette()
     assert all(RED2 not in {c for _, c in l.getcolors()} for l in p.frames[0].layers)

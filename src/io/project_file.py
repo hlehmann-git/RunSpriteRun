@@ -11,7 +11,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from src.core.layers import colours_of, flatten
+from src.core.layers import COUNT as LAYER_COUNT, colours_of, flatten, grown_layers
 from src.core.project import ControlRule, Frame, Group, Project, Rule, Transition
 from src.core.rules import ACTION_KEYS, has_opposites
 from src.core.rules import FPS_CHOICES, MAX_FRAMES, MAX_SIZE, MIN_SIZE, valid_group_name, valid_label, valid_project_name
@@ -43,7 +43,8 @@ def _rule_from_json(d) -> Rule | None:
     return Rule(kind=d["kind"], target=d["target"], loop=bool(d.get("loop", False)), once=bool(d.get("once", False)))
 
 
-LAYER_FILES = ("fg", "core", "bg")
+LAYER_FILES = ("fg2", "fg", "core", "bg", "bg2")
+OLD_LAYER_COUNT = 3                 # projects written before ForeGround 2 and BackGround 2 existed
 
 
 def _frame_json(i: int, f: Frame) -> dict:
@@ -170,9 +171,11 @@ def open_project(path: str | Path) -> Project:
                 layers = None
                 if e.get("layers") is not None:
                     names = e["layers"]
-                    if not (isinstance(names, list) and len(names) == 3):
+                    if not (isinstance(names, list) and len(names) in (OLD_LAYER_COUNT, LAYER_COUNT)):
                         raise ProjectFileError("A frame's layers in the file are not valid.")
                     layers = tuple(load_image(n) for n in names)
+                    if len(layers) == OLD_LAYER_COUNT:
+                        layers = grown_layers(layers, transparent)    # an older project: the new layers start empty
                     img = flatten(layers, transparent)              # the layers decide; the flat picture follows them
                     for im in layers:
                         used |= colours_of(im)

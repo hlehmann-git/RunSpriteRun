@@ -155,7 +155,7 @@ class EditPanel(Panel):
         self.controller = controller
         self.edit = controller.edit
         body = self.body = QWidget(self)
-        body.setGeometry(1, 1, 686, 206)
+        body.setGeometry(1, 1, 686, 262)
         # ---- head
         head = QWidget(body)
         head.setObjectName("head")
@@ -185,14 +185,14 @@ class EditPanel(Panel):
         self.edit.notice.connect(self._notice)
         # ---- everything below the head is switched on and off with Edit mode
         self.work = QWidget(body)
-        self.work.setGeometry(0, 30, 686, 176)
+        self.work.setGeometry(0, 30, 686, 232)
         self.work.setStyleSheet("QLabel { background: transparent; }")
-        Box("LAYERS", self.work, 13, 8, 164, 102)
+        Box("LAYERS", self.work, 13, 8, 164, 216)
         Box("TOOLS", self.work, 200, 8, 222, 102)
-        Box("ACTION", self.work, 13, 117, 409, 56)
+        Box("ACTION", self.work, 200, 114, 222, 110)
         self.eyes, self.targets = [], []
         for i, name in enumerate(LAYER_NAMES):
-            y = 24 + i * 28
+            y = 26 + i * 34
             eye = IconButton("eye", self.work, 24, True)
             eye.move(22, y)
             eye.setChecked(True)
@@ -214,7 +214,7 @@ class EditPanel(Panel):
                                           ("rotate_left", "rot_left"), ("rotate_180", "rot_180"), ("flip_h", "flip_h"),
                                           ("flip_v", "flip_v"), ("undo", "undo"), ("redo", "redo"))):
             b = IconButton(kind, self.work)
-            b.move(20 + i * 36, 135)
+            b.move(200 + (21 if i < 5 else 39) + (i % 5) * 36, 132 + (i // 5) * 38)
             b.setToolTip(ACTION_TIPS[name])
             self.actions[name] = b
         self.actions["mirror_v"].clicked.connect(lambda: self.edit.toggle_mirror("v"))
@@ -225,7 +225,7 @@ class EditPanel(Panel):
         self.actions["redo"].clicked.connect(self.edit.redo)
         controller.selection_changed.connect(lambda _i: self._refresh())
         self.tool_buttons: dict[str, IconButton] = {}
-        for i in range(12):
+        for i in range(len(TOOL_GRID)):
             c, r = i % 6, i // 6
             if i < len(TOOL_GRID):
                 name = TOOL_GRID[i]
@@ -239,7 +239,7 @@ class EditPanel(Panel):
             b.move(207 + c * 36, 25 + r * 36)
         self.options_title = self._heading("OPTIONS", 438, 14)
         self.scroll = QScrollArea(self.work)
-        self.scroll.setGeometry(432, 22, 238, 146)
+        self.scroll.setGeometry(432, 22, 238, 202)
         self.scroll.setStyleSheet("QScrollArea { background: #24262c; border: 1px solid #3e414a; border-radius: 4px; }"
                                   "QScrollBar:vertical { background: #1e1f24; width: 10px; border: 1px solid #4a4e5a; border-radius: 4px; margin: 0; }"
                                   "QScrollBar::handle:vertical { background: #aab2c8; border-radius: 3px; min-height: 24px; margin: 1px; }"
@@ -303,7 +303,7 @@ class EditPanel(Panel):
         if self._built_for != e.tool:
             self._build_options()
         self._refresh_select_buttons()
-        for i in range(3):
+        for i in range(len(LAYER_NAMES)):
             for box, val in ((self.eyes[i], e.visible[i]), (self.targets[i], e.target[i])):
                 if box.isChecked() != val:
                     box.blockSignals(True)
