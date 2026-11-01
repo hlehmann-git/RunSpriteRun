@@ -20,7 +20,7 @@ from src.core import groups
 from src.core.project import ControlRule, Project, Rule, Transition
 from src.core.rules import ACTION_KEYS, DIAGONALS, KEY_LABELS, OPPOSITE, buttons_for, key_available, keys_for
 
-HEADING = "color: #9aa0ae; font-size: 10px; font-weight: 700;"
+HEADING = "color: #e4e6ec; font-size: 11px; font-weight: 700;"
 NUMBER = "color: #d6a046; font-weight: 700;"
 GREY = "color: #9aa0ae;"
 RED = "color: #ff7b72; font-size: 11px;"

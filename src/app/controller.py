@@ -416,6 +416,11 @@ class Controller(QObject):
         settings_io.save(new)
         self.settings_changed.emit()
 
+    def toggle_solid_background(self) -> None:
+        """Toggle Solid background (Ctrl+B): the transparent colour shown solid, or as a checkerboard."""
+        from dataclasses import replace
+        self.apply_settings(replace(self.settings, solid_background=not self.settings.solid_background))
+
     # ---- + colour -------------------------------------------------------------------------------
     def add_colour_blocked(self) -> str | None:
         """None if the + colour button can be used, otherwise why it is greyed out (no project, or fixed colours).

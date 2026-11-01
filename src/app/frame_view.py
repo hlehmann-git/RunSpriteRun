@@ -10,7 +10,7 @@ from src.app.arrow_button import ArrowButton
 from src.app.controller import Controller
 from src.app.panel import PANEL_STYLE, Panel
 from src.app.cursors import cursor_for
-from src.app.sprite_view import SpriteView
+from src.app.sprite_view import SpriteView, follow_checker
 from src.app.theme import TOGGLE_BUTTON_STYLE
 
 
@@ -29,6 +29,7 @@ class FrameViewPanel(Panel):
         self.label.setGeometry(174, 8, 100, 26)
         self.view = SpriteView(self, grid=controller.settings.grid)
         self.view.move(16, 38)
+        follow_checker(self.view, controller)
         self.view.pixel_clicked.connect(self._pixel_clicked)
         self.view.pixel_right_clicked.connect(self._pixel_right_clicked)
         self.view.drag_started.connect(self._drag_started)

@@ -200,6 +200,10 @@ class MainWindow(QMainWindow):
         self.act_settings.triggered.connect(self.show_settings)
         self.act_help.triggered.connect(lambda: HelpDialog(self).exec())
         self.act_about.triggered.connect(lambda: AboutDialog(self).exec())
+        self.act_solid_bg = QAction("Toggle Solid background", self)    # Ctrl+B; the X box in the colour editor
+        self.act_solid_bg.setShortcut(QKeySequence("Ctrl+B"))
+        self.act_solid_bg.triggered.connect(lambda: self.controller.toggle_solid_background())
+        self.addAction(self.act_solid_bg)
 
     # ---- RunSpriteRun: Esc and the keys -----------------------------------------------------------------
     def toggle_run(self) -> None:
@@ -496,7 +500,7 @@ class MainWindow(QMainWindow):
         p = c.project
         if p is None or c.edit.mode or not p.frames or p.system.is_fixed or not can_reduce(p):
             return
-        dlg = ReduceDialog(self, p, c.selected)
+        dlg = ReduceDialog(self, p, c.selected, checker=not c.settings.solid_background)
         if not dlg.exec():
             return
         keep = dlg.keep()

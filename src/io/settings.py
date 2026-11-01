@@ -14,6 +14,7 @@ EXPORT_MODES = ("sheet", "groups")            # One sheet with all frames / One 
 class Settings:
     grid: bool = True                          # pixel grid in the Frame view (default on)
     export_mode: str = "sheet"                 # what the Export Sprite Sheet dialog starts with
+    solid_background: bool = False             # transparent colour shown solid, not as a checkerboard (Ctrl+B)
 
 
 def settings_path() -> Path:
@@ -35,6 +36,8 @@ def load(path: Path | None = None) -> Settings:
         return s
     if isinstance(data.get("grid"), bool):
         s.grid = data["grid"]
+    if isinstance(data.get("solid_background"), bool):
+        s.solid_background = data["solid_background"]
     if data.get("export_mode") in EXPORT_MODES:
         s.export_mode = data["export_mode"]
     return s

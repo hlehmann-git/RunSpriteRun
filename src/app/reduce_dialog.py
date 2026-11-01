@@ -15,9 +15,10 @@ VIEW = 200
 
 
 class ReduceDialog(QDialog):
-    def __init__(self, parent: QWidget, project: Project, frame: int = 0) -> None:
+    def __init__(self, parent: QWidget, project: Project, frame: int = 0, checker: bool = False) -> None:
         super().__init__(parent)
         self.project = project
+        self.checker = checker                     # the transparent colour shown as a checkerboard
         self.setWindowTitle("Reduce Palette")
         self.setWindowFlag(Qt.WindowContextHelpButtonHint, False)
         self.setModal(True)
@@ -85,7 +86,7 @@ class ReduceDialog(QDialog):
         return self._maps[keep]
 
     def _show(self, label: QLabel, img) -> None:
-        big = scaled_sprite(img, self.project.transparent, VIEW, VIEW, False)
+        big = scaled_sprite(img, self.project.transparent, VIEW, VIEW, False, checker=self.checker)
         label.setPixmap(QPixmap.fromImage(to_qimage(big)))
 
     def _refresh(self) -> None:

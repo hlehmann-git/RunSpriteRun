@@ -17,7 +17,8 @@ from src.core.rules import GROUP_NAME_MAX, KEY_LABELS, KEYS, MAX_GROUPS, keys_te
 
 NEW_GROUP = "New group"
 GREY = "color: #9aa0ae;"
-HEADING = "color: #9aa0ae; font-size: 10px; font-weight: 700;"
+NO_COLOUR = "#3a3d47"               # the frame pictures' border before any group is shown
+HEADING = "color: #e4e6ec; font-size: 11px; font-weight: 700;"
 APPLY_STYLE = ("QPushButton { background: #3780cd; border: 1px solid #78b9ff; border-radius: 5px; color: #ffffff; "
                "font-weight: 600; } QPushButton:hover { background: #4a90dd; } QPushButton:pressed { background: #2c68a8; } "
                "QPushButton:disabled { background: #30323a; border: 1px solid #45474f; color: #78787f; }")
@@ -46,28 +47,30 @@ class SetFrameGroupPanel(Panel):
         self._heading("GROUP", 17, 53)
         self._row_label("Name", 17, 72, 50)
         self.name = QLineEdit(self)
-        self.name.setGeometry(69, 72, 200, 26)
+        self.name.setGeometry(69, 72, 130, 26)
         self.name.setMaxLength(GROUP_NAME_MAX)
-        self._row_label("Colour", 17, 115, 50)
+        self._row_label("Colour", 209, 72, 46)
         self.colour_btn = QPushButton(self)
-        self.colour_btn.setGeometry(69, 115, 56, 26)
-        self.colour_hint = self._row_label("click to change", 137, 115, 110)
-        self.colour_hint.setStyleSheet("color: #9aa0ae; font-size: 11px;")
+        self.colour_btn.setGeometry(257, 72, 20, 26)
+        self.colour_btn.setToolTip("Click to change the group colour")
 
-        self._heading("FRAMES", 17, 164)
-        self.from_view = SpriteView(self, grid=False, size=36)
-        self.to_view = SpriteView(self, grid=False, size=36)
+        self.from_ring, self.to_ring = QFrame(self), QFrame(self)     # the group colour around each frame picture
+        for ring, x in ((self.from_ring, 29), (self.to_ring, 165)):
+            ring.setGeometry(x, 110, 102, 102)
+        self._ring_colour(NO_COLOUR)
+        self.from_view = SpriteView(self, grid=False, size=96)
+        self.to_view = SpriteView(self, grid=False, size=96)
         self.from_box = QSpinBox(self)
         self.to_box = QSpinBox(self)
         for b in (self.from_box, self.to_box):
             b.setButtonSymbols(QSpinBox.NoButtons)
             b.setFixedSize(46, 26)
-        self._row_label("From", 17, 195, 36)
-        self.from_box.move(55, 195)
-        self.from_view.move(107, 188)
-        self._row_label("To", 161, 195, 24)
-        self.to_box.move(183, 195)
-        self.to_view.move(235, 188)
+        self.from_view.move(32, 113)
+        self.to_view.move(168, 113)
+        self._row_label("From", 38, 224, 36)              # the frame numbers sit under their pictures
+        self.from_box.move(76, 224)
+        self._row_label("To", 182, 224, 24)
+        self.to_box.move(206, 224)
 
         # v2.0.9: the keys that play a group are set in the Frame Group Control window (Set Rules). The old key and release
         # controls stay as hidden holders of the group's values, so Apply keeps them unchanged.
@@ -81,7 +84,7 @@ class SetFrameGroupPanel(Panel):
         self.rules_text.setStyleSheet("color: #c9ccd6; font-size: 12px;")
         self.rules_text.setGeometry(299, 77, 225, 133)
         self.rules_btn = QPushButton("Set Rules", self)
-        self.rules_btn.setGeometry(299, 198, 120, 26)
+        self.rules_btn.setGeometry(299, 224, 120, 26)
         self.rules_btn.clicked.connect(self.set_rules_requested)
         self.key = QComboBox(self)
         for k in KEYS:
@@ -97,7 +100,7 @@ class SetFrameGroupPanel(Panel):
         for w in (self.key, self.will_loop, self.release_label, self.release):
             w.setParent(self._hidden)
         self.apply_btn = QPushButton("Apply", self)
-        self.apply_btn.setGeometry(447, 198, 80, 26)
+        self.apply_btn.setGeometry(447, 224, 80, 26)
         self.apply_btn.setDefault(True)
         self.apply_btn.setStyleSheet(APPLY_STYLE)
 
@@ -255,7 +258,8 @@ class SetFrameGroupPanel(Panel):
             w.setEnabled(not blank)
         self.release.setVisible(not blank)
         self.release_label.setVisible(not blank)
-        self.colour_hint.setVisible(not blank)
+        self.from_ring.setVisible(not blank)
+        self.to_ring.setVisible(not blank)
         self.from_view.setVisible(not blank)
         self.to_view.setVisible(not blank)
         self.will_loop.setVisible(not blank and self.key.currentData() is not None)
@@ -273,6 +277,7 @@ class SetFrameGroupPanel(Panel):
             self.key.blockSignals(False)
             self._set_colour(QColor(0, 0, 0))
             self.colour_btn.setStyleSheet("background: #1e1f24; border: 1px solid #3a3d47; border-radius: 4px;")
+            self._ring_colour(NO_COLOUR)
 
     def _thumbs(self) -> None:
         p = self.controller.project
@@ -287,6 +292,11 @@ class SetFrameGroupPanel(Panel):
     def _set_colour(self, c: QColor) -> None:
         self._colour = c
         self.colour_btn.setStyleSheet(f"background: {c.name()}; border: 1px solid #8a8a94; border-radius: 4px;")
+        self._ring_colour(c.name())
+
+    def _ring_colour(self, colour: str) -> None:
+        for ring in (self.from_ring, self.to_ring):
+            ring.setStyleSheet(f"background: {colour}; border: none; border-radius: 3px;")
 
     def _pick_colour(self) -> None:
         c = QColorDialog.getColor(self._colour, self, "Group Colour")

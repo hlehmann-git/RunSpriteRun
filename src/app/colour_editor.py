@@ -183,7 +183,7 @@ class EyedropperButton(QAbstractButton):
         p.drawImage(QRect(3, 3, SIDE - 6, SIDE - 6), img)    # a little smaller than the box, so the whole drawing fits
 
 
-PANEL_H = 204                # the bottom half of the one card (the palette is the top half)
+PANEL_H = 233                # the bottom half of the one card (the palette is the top half)
 BOTTOM_CARD_STYLE = ("Panel { background: #2a2c33; border: 1px solid #3a3d47; border-top: none; "
                      "border-top-left-radius: 0px; border-top-right-radius: 0px; "
                      "border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; }")
@@ -266,6 +266,15 @@ class ColourEditorPanel(Panel):
         self.eyedropper = EyedropperButton(self)
         self.eyedropper.move(288, 158)
         self.eyedropper.clicked.connect(self._toggle_eyedropper)
+        self.solid_box = IconButton("target", self, 24, True)       # Toggle Solid background (Ctrl+B): the same X box
+        self.solid_box.move(20, 198)                                 # as the Edit panel's layers
+        self.solid_box.setToolTip("Toggle Solid background (Ctrl+B): show the transparent colour as itself instead "
+                                  "of a checkerboard")
+        self.solid_box.setChecked(controller.settings.solid_background)
+        self.solid_box.toggled.connect(self._solid_toggled)
+        self.solid_label = QLabel("Toggle Solid background", self)
+        self.solid_label.setGeometry(58, 198, 200, 24)
+        controller.settings_changed.connect(self._solid_setting)
 
         controller.project_changed.connect(self._project_changed)
         controller.project_changed.connect(self._refresh_add_btn)
@@ -316,6 +325,16 @@ class ColourEditorPanel(Panel):
 
     def _add_clicked(self) -> None:
         add_primary_colour(self.window(), self.controller)
+
+    def _solid_toggled(self, on: bool) -> None:
+        if on != self.controller.settings.solid_background:
+            self.controller.toggle_solid_background()
+
+    def _solid_setting(self) -> None:
+        self.solid_box.blockSignals(True)
+        self.solid_box.setChecked(self.controller.settings.solid_background)
+        self.solid_box.blockSignals(False)
+        self.solid_box.update()
 
     def _refresh_transparent(self) -> None:
         p = self.controller.project

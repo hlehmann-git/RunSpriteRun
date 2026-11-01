@@ -10,7 +10,7 @@ You bring in your sprites, the program fits them to the colours of the system yo
 - **Works offline.** One project is open at a time, and nothing is sent anywhere.
 - **Eight systems.** Sega Genesis / Mega Drive, Super Nintendo (SNES), Atari ST, Atari STE, Amiga, Apple IIgs, Commodore 64 and Apple II (Double Hi-Res). Each keeps your colours inside that system's rules.
 - **Up to 120 frames** of 4 x 4 to 128 x 128 pixels, and up to 32 animation groups.
-- **Edit mode** for drawing and fixing pixels, with three layers.
+- **Edit mode** for drawing and fixing pixels, with five layers.
 - **Edit menu tools** to shrink a sprite or reduce its number of colours.
 
 ## Who it is for
@@ -48,7 +48,7 @@ Tip: to look around before making anything, press **Open Project** in the Start 
 - **Set Frame Group panel**: where groups of frames are defined; its Set Rules button opens Frame Group Control, where keys are given to groups.
 - **Timeline and frames** (bottom): every frame in order, with a key pad picture at its left end.
 
-The three sprite views always have a black background and enlarge the sprite in whole-number steps only, with no smoothing, so you see exactly the pixels you will get.
+The three sprite views always have a black background and enlarge the sprite in whole-number steps only, with no smoothing, so you see exactly the pixels you will get. Pixels in the transparent colour are shown as a grey checkerboard, the usual sign for "see-through"; press **Ctrl+B** to see the real transparent colour instead (see The transparent colour, section 6).
 
 ## 3. Starting a project
 
@@ -161,6 +161,12 @@ Drag a frame left or right, or press **Ctrl+Left** / **Ctrl+Right** to move the 
 
 Ctrl+C and Ctrl+V work only while the timeline has the focus and you are not typing a label.
 
+### Making a group from the timeline
+
+Select a run of frames (Shift+click, or a single frame), right-click and choose **Create new Frame Group**. The Set Frame Group panel opens as a new group with **From** and **To** already set to your selection, and the cursor in the Name box. Type a name, choose a colour and press Apply.
+
+The menu item is greyed out, with a tooltip saying why, when the selected frames have a gap ("Frames must be sequential") or when any of them is already in a group (groups cannot overlap). Right-clicking a frame outside the selection selects that frame and uses it on its own.
+
 ### Deleting frames
 
 Select the frames and press **Delete**. The program asks you to confirm and reminds you that you can undo. A group keeps its remaining frames; a group left with none is deleted, and the question says so. At least one frame must remain.
@@ -187,10 +193,10 @@ A **frame group** is a named run of frames that can be played, and assigned to a
 
 In the **Set Frame Group** panel:
 
-1. Choose **New group** in the list beside the panel title (or use **Group > New Group**, Ctrl+G).
+1. Choose **New group** in the list beside the panel title (or use **Group > New Group**, Ctrl+G, or right-click selected frames in the timeline and choose **Create new Frame Group**).
 2. Type a **Name**: 1 to 20 characters, unique in the project, letters, numbers, a hyphen and an underscore, no spaces.
-3. Choose a **Colour**. It becomes the border colour of the group's frames in the timeline.
-4. Choose the **From** and **To** frames. A group is a continuous run, and can be a single frame.
+3. Choose a **Colour** with the small swatch beside the name. It becomes the border colour of the group's frames in the timeline and of the From and To pictures in the panel.
+4. Choose the **From** and **To** frames in the boxes under the two pictures, which show the first and last frame of the group. A group is a continuous run, and can be a single frame.
 5. **Press Set Rules to choose which keys play the group and what happens when they are let go (see Frame Group Control, below)**.
 6. Press **Apply**.
 
@@ -256,7 +262,7 @@ If you rename a group, the Only if in lists follow it. If you delete a group, a 
 
 **Transitions.** Under the rules is a Transitions section. A row reads: Going from [one group, several groups or Any] to [a group] play [a group] first, and the group that plays first plays once. The transition group has no key of its own. For example, going from WalkRight to WalkLeft plays TurnLeft once, then WalkLeft. A row that names the from-groups beats an Any row. Starts count too (Idle to Walk). Transitions apply when a key press changes the group; stops use the group's release choice (Go to Group, play once). Tick 'Can be interrupted' if a new key press should cut a transition short; by default it finishes first. Groups played by an action key cannot be used in transitions.
 
-**Action animations (7, 8, 9, 0).** Some animations are not played by the controller but by the game, for example a death when a character touches a spike. Keys 7, 8, 9 and 0 let you test them. They are shown apart, in amber, under the 1 to 6 buttons on the key pad and in the keys box of a rule, and work on every system. Set them up like any rule: Add rule, choose 7, 8, 9 or 0 in the keys box (they stay plain until you pick one, then turn orange), then choose the group. An action rule always plays once, and its release list holds only the frames of its own group; the last frame is the default, so the last frame stays (for example for a Die group). An action key stands alone: it cannot be combined with any other key, and while it is held the controller keys are ignored. An action group is kept apart from the controls: a group played by an action key cannot be used by any other rule, in a transition or as a release target, and a frame that is needed in both must be duplicated first. The window marks any clash in red.
+**Action animations (7, 8, 9, 0).** Some animations are not played by the controller but by the game, for example a death when a character touches a spike. Keys 7, 8, 9 and 0 let you test them. They are shown apart, in amber, under the 1 to 6 buttons on the key pad and in the keys box of a rule, and work on every system. Set them up like any rule: Add rule, choose 7, 8, 9 or 0 in the keys box (they stay plain until you pick one, then turn orange), then choose the group. An action rule can play once (the default) or loop while its key is held, for example a looping death wiggle; its release list holds only the frames of its own group, and the last frame is the default, so the last frame stays when you let go (for example for a Die group). An action key stands alone: it cannot be combined with any other key, and while it is held the controller keys are ignored. An action group is kept apart from the controls: a group played by an action key cannot be used by any other rule, in a transition or as a release target, and a frame that is needed in both must be duplicated first. The window marks any clash in red.
 
 ### Running the animation
 
@@ -317,7 +323,8 @@ Click the eyedropper, then a palette square or a pixel in the **Frame view**, th
 One palette colour is the project's **transparent colour**. It counts toward the system's colour maximum and is marked with a small white **T**. A new project uses magenta (#FF00FF).
 
 - To change it, click the transparent colour box, then a palette square.
-- It is shown as its real colour in the Frame view, previews and RunSpriteRun, so pick a colour you can see against your sprite.
+- In the Frame view, the Frame Group Preview, the RunSpriteRun window and the Reduce Palette preview it is shown as a light and mid grey **checkerboard**, so you can see at once which pixels are see-through. Each square covers 3 x 3 sprite pixels and grows with the zoom, so the squares always line up with the pixel grid; grid lines over the checkerboard are drawn softer.
+- **Toggle Solid background** (the X box under the transparent colour box, or **Ctrl+B**) shows the real transparent colour instead, which is useful to check it before exporting. An X means the solid colour is showing; an empty box means the checkerboard. The choice is remembered the next time you start the program. The timeline thumbnails and the small From and To pictures always show the transparent colour as they did before.
 - Exports and saved sheets use its real colour. No file the program writes ever carries an alpha channel, because the retro systems treat one palette colour as transparent.
 
 ### Fixed-palette systems
@@ -345,7 +352,9 @@ Your edits are made on a working copy. When you switch Edit mode off, a box offe
 
 ### Layers
 
-There are three layers: **ForeGround**, **Core** and **BackGround**. Each has an eye box (visible) and an X box (the layer your edits go to). You can tick several to edit them together. A hidden layer cannot be drawn on. A frame that was never edited, and any imported frame, has its picture on Core. When shown, saved or exported, the layers are flattened with ForeGround on top, then Core, then BackGround.
+There are five layers, from top to bottom: **ForeGround 2**, **ForeGround 1**, **Core**, **BackGround 1** and **BackGround 2**. Each has an eye box (visible) and an X box (the layer your edits go to). You can tick several to edit them together. A hidden layer cannot be drawn on. A frame that was never edited, and any imported frame, has its picture on Core. When shown, saved or exported, the layers are flattened in that order, ForeGround 2 on top and BackGround 2 at the bottom.
+
+Projects saved before version 2.0.18 had three layers. They open with their ForeGround on ForeGround 1, Core on Core and BackGround on BackGround 1; ForeGround 2 and BackGround 2 start empty.
 
 ### Tools
 
@@ -373,7 +382,7 @@ Line, Square and Circle are pixel perfect at thickness 1, with no doubled corner
 
 ### Actions row
 
-Nine icons under the layers:
+Nine icons in the Action box, under the tools:
 
 1. **Mirror vertically** and 2. **Mirror horizontally** are toggles. Click one, then click in the Frame view to place a yellow guide line. Pencil, Eraser, Line, Square and Circle then draw mirrored across the line. Use both for four-way symmetry. Click the icon again to switch it off.
 2. **Rotate 90 degrees right**, 4. **Rotate 90 degrees left** and 5. **Rotate 180 degrees**. Rotating 90 degrees needs a square area.
@@ -412,7 +421,7 @@ Merges colours so the project uses fewer of them, for example to fit a tighter c
 
 1. Choose **Edit > Reduce Palette**.
 2. Choose how many colours to keep, from 2 up to one fewer than you have now. The transparent colour is not counted as one that can be merged away.
-3. Look at the **From** and **To** previews. Use the frame spinner to check other frames.
+3. Look at the **From** and **To** previews (the transparent colour shows as the checkerboard unless Toggle Solid background is on). Use the frame spinner to check other frames.
 4. Confirm.
 
 The program joins the colours that are closest to each other, and the more heavily used colour survives. Every pixel of a removed colour becomes the nearest kept colour, in every frame. Reduce Palette is unavailable on the Commodore 64 and Apple II Double Hi-Res, whose palettes are fixed.
@@ -500,6 +509,7 @@ Saved and exported sheets use the same layout as a blank sheet, so a sheet can b
 | Ctrl+, | Settings | Anywhere, with a project open |
 | Ctrl+Z / Ctrl+Y | Undo / Redo | Anywhere (in Edit mode they step through your edits) |
 | Ctrl+G | New group | Anywhere |
+| Ctrl+B | Toggle Solid background: the transparent colour as itself or as a checkerboard | Anywhere |
 | F1 | Help | Anywhere |
 | Esc | Stop RunSpriteRun (while it is running) | Normal mode |
 | W A S D, 1 to 6, 7 8 9 0 | Play the group assigned to the key | While RunSpriteRun is running |

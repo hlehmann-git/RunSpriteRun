@@ -28,6 +28,7 @@ class SpriteView(QWidget):
         super().__init__(parent)
         self.setFixedSize(size, size)
         self.grid = grid
+        self.checker = False                  # the transparent colour shown as a checkerboard (see follow_checker)
         self._image: Image.Image | None = None
         self._transparent: Colour = (0, 0, 0)
         self.zoom: int | None = None          # None: the largest whole-number scale that fits
@@ -244,11 +245,11 @@ class SpriteView(QWidget):
         else:
             if self.navigable:
                 _d, sc, left, top, _w, _h = self._geometry()
-                frame = render_window(self._image, self._transparent, pw, ph, sc, left, top, self.grid)
+                frame = render_window(self._image, self._transparent, pw, ph, sc, left, top, self.grid, self.checker)
             elif self.zoom is None:
-                frame = render_sprite(self._image, self._transparent, pw, ph, self.grid)
+                frame = render_sprite(self._image, self._transparent, pw, ph, self.grid, self.checker)
             else:
-                frame = render_sprite_at(self._image, self._transparent, pw, ph, self.zoom)
+                frame = render_sprite_at(self._image, self._transparent, pw, ph, self.zoom, self.checker)
         painter = QPainter(self)
         painter.drawImage(0, 0, to_qimage(frame, dpr))
         if self._image is not None and self.selection is not None:
@@ -272,6 +273,15 @@ class SpriteView(QWidget):
             if self.guides.get("h") is not None:
                 y = (oy + self.guides["h"] * s / 2) / dpr
                 painter.drawLine(0, round(y), self.width(), round(y))
+
+
+def follow_checker(view: SpriteView, controller) -> None:
+    """The view shows the transparent colour as a checkerboard unless Toggle Solid background is on."""
+    def update() -> None:
+        view.checker = not controller.settings.solid_background
+        view.update()
+    update()
+    controller.settings_changed.connect(update)
 
 
 def offer_to_picker(view: SpriteView, controller) -> None:
