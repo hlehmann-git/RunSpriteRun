@@ -271,3 +271,69 @@ def test_copied_frame_is_still_found_after_undo_and_moves(win, monkeypatch):
     assert c.copied_index() == 0
     c.undo()                                              # ... and Undo brings it back as the same frame
     assert c.copied_index() == 4
+
+
+# ---- Create new Frame Group (right click on the timeline) ---------------------------------------------------------
+def _menu_pick(monkeypatch, text):
+    """Make the next right-click menu choose the item with this text (None: choose nothing)."""
+    from src.app.timeline import TimelinePanel
+    monkeypatch.setattr(TimelinePanel, "_exec_menu",
+                        lambda self, menu, pos: next((a for a in menu.actions() if a.text() == text), None))
+
+
+def _menu_item(monkeypatch, t, slot, text):
+    """Open the menu on `slot` and hand back the item with this text, without choosing it."""
+    from src.app.timeline import TimelinePanel
+    found = {}
+    monkeypatch.setattr(TimelinePanel, "_exec_menu",
+                        lambda self, menu, pos: found.setdefault("a", next(a for a in menu.actions() if a.text() == text)))
+    t.slots[slot].thumb.menu_requested.emit(slot, QPoint(0, 0))
+    return found["a"]
+
+
+def test_a_shift_selection_can_start_a_new_frame_group(win, monkeypatch):
+    c, t = win.controller, tl(win)
+    c.select(4)
+    c.select_extra(6, True)                                  # Shift+click: frames 5 to 7 on screen
+    assert c.selection() == [4, 5, 6]
+    _menu_pick(monkeypatch, "Create new Frame Group")
+    t.slots[4].thumb.menu_requested.emit(4, QPoint(0, 0))
+    panel = win.panels["Set Frame Group"]
+    assert (panel.from_box.value(), panel.to_box.value()) == (5, 7)       # the boxes count from 1
+    assert panel.name.text() == "" and panel.current is None              # a new group, nothing made yet
+    assert len(c.project.groups) == 1                                     # Apply has not been clicked
+
+
+def test_one_frame_on_its_own_can_start_a_new_frame_group(win, monkeypatch):
+    c, t = win.controller, tl(win)
+    c.select(5)
+    _menu_pick(monkeypatch, "Create new Frame Group")
+    t.slots[5].thumb.menu_requested.emit(5, QPoint(0, 0))
+    panel = win.panels["Set Frame Group"]
+    assert (panel.from_box.value(), panel.to_box.value()) == (6, 6)
+
+
+def test_frames_with_a_gap_cannot_start_a_group(win, monkeypatch):
+    c, t = win.controller, tl(win)
+    c.select(4)
+    c.select_extra(6, False)                                 # Ctrl+click: 4 and 6, missing 5
+    assert c.selection() == [4, 6]
+    act = _menu_item(monkeypatch, t, 4, "Create new Frame Group")
+    assert not act.isEnabled() and "sequential" in act.toolTip()
+
+
+def test_frames_already_in_a_group_cannot_start_another(win, monkeypatch):
+    c, t = win.controller, tl(win)
+    c.select(0)                                              # frames 1 and 2 are group A
+    act = _menu_item(monkeypatch, t, 0, "Create new Frame Group")
+    assert not act.isEnabled() and "cannot overlap" in act.toolTip() and "A" in act.toolTip()
+
+
+def test_right_clicking_outside_the_selection_uses_the_frame_clicked(win, monkeypatch):
+    c, t = win.controller, tl(win)
+    c.select(4)
+    c.select_extra(6, True)
+    _menu_pick(monkeypatch, "Create new Frame Group")
+    t.slots[7].thumb.menu_requested.emit(7, QPoint(0, 0))     # a frame outside the selection
+    panel = win.panels["Set Frame Group"]
+    assert c.selection() == [7] and (panel.from_box.value(), panel.to_box.value()) == (8, 8)

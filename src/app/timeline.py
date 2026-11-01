@@ -188,6 +188,8 @@ class ArrowButton(QToolButton):
 
 
 class TimelinePanel(Panel):
+    new_group_requested = Signal(int, int)   # Create new Frame Group: the first and last frame selected (0-based)
+
     def __init__(self, parent: QWidget, controller: Controller) -> None:
         super().__init__("Timeline and frames", parent)
         self.controller = controller
@@ -402,6 +404,14 @@ class TimelinePanel(Panel):
         menu = QMenu(self)
         before = menu.addAction("Copy before")
         after = menu.addAction("Copy after")
+        menu.addSeparator()
+        chosen_frames = c.selection()
+        new_group = menu.addAction("Create new Frame Group")
+        why = self._cannot_group(chosen_frames)
+        new_group.setEnabled(why is None)
+        if why is not None:
+            new_group.setToolTip(why)
+            menu.setToolTipsVisible(True)
         self._asking = True
         try:
             chosen = self._exec_menu(menu, pos)
@@ -411,6 +421,23 @@ class TimelinePanel(Panel):
             c.clone_frame(i, False)
         elif chosen is after:
             c.clone_frame(i, True)
+        elif chosen is new_group:
+            self.new_group_requested.emit(chosen_frames[0], chosen_frames[-1])
+
+    def _cannot_group(self, frames: list[int]) -> str | None:
+        """Why the selected frames cannot start a new group, or None if they can. A group is a run of frames in a
+        row, and groups cannot overlap, so frames already in one are refused."""
+        p = self.controller.project
+        if p is None or not frames:
+            return "Select one or more frames first."
+        if frames[-1] - frames[0] + 1 != len(frames):
+            return "Frames must be sequential: this selection has gaps."
+        member = group_of_frame(p)
+        taken = sorted({member[i] for i in frames if member[i] is not None})
+        if taken:
+            which = taken[0] if len(taken) == 1 else ", ".join(taken)
+            return f"Already in group {which}. Groups cannot overlap."
+        return None
 
     def _label_done(self, s: Slot) -> None:
         i = self.first + s.slot

@@ -32,6 +32,7 @@ class SetFrameGroupPanel(Panel):
         self.controller = controller
         self.current: str | None = None
         self.blank = True                # no group to show: the panel is empty and greyed out
+        self._new_range: tuple[int, int] | None = None   # frames a new group starts with (Create new Frame Group)
         self._colour = QColor(0, 0, 0)
 
         # Layout (v2): header row, then two columns separated by a thin line.
@@ -40,20 +41,20 @@ class SetFrameGroupPanel(Panel):
         short_popup(self.chooser)
         self.chooser.setGeometry(161, 9, 150, 26)
         self._line(17, 41, 508, 1)
-        self._line(285, 53, 1, 138)
+        self._line(285, 57, 1, 184)
 
-        self._heading("GROUP", 17, 50)
-        self._row_label("Name", 17, 64, 50)
+        self._heading("GROUP", 17, 53)
+        self._row_label("Name", 17, 72, 50)
         self.name = QLineEdit(self)
-        self.name.setGeometry(69, 64, 200, 26)
+        self.name.setGeometry(69, 72, 200, 26)
         self.name.setMaxLength(GROUP_NAME_MAX)
-        self._row_label("Colour", 17, 96, 50)
+        self._row_label("Colour", 17, 115, 50)
         self.colour_btn = QPushButton(self)
-        self.colour_btn.setGeometry(69, 96, 56, 26)
-        self.colour_hint = self._row_label("click to change", 137, 96, 110)
+        self.colour_btn.setGeometry(69, 115, 56, 26)
+        self.colour_hint = self._row_label("click to change", 137, 115, 110)
         self.colour_hint.setStyleSheet("color: #9aa0ae; font-size: 11px;")
 
-        self._heading("FRAMES", 17, 133)
+        self._heading("FRAMES", 17, 164)
         self.from_view = SpriteView(self, grid=False, size=36)
         self.to_view = SpriteView(self, grid=False, size=36)
         self.from_box = QSpinBox(self)
@@ -61,42 +62,42 @@ class SetFrameGroupPanel(Panel):
         for b in (self.from_box, self.to_box):
             b.setButtonSymbols(QSpinBox.NoButtons)
             b.setFixedSize(46, 26)
-        self._row_label("From", 17, 156, 36)
-        self.from_box.move(55, 156)
-        self.from_view.move(107, 151)
-        self._row_label("To", 161, 156, 24)
-        self.to_box.move(183, 156)
-        self.to_view.move(235, 151)
+        self._row_label("From", 17, 195, 36)
+        self.from_box.move(55, 195)
+        self.from_view.move(107, 188)
+        self._row_label("To", 161, 195, 24)
+        self.to_box.move(183, 195)
+        self.to_view.move(235, 188)
 
         # v2.0.9: the keys that play a group are set in the Frame Group Control window (Set Rules). The old key and release
         # controls stay as hidden holders of the group's values, so Apply keeps them unchanged.
         self._hidden = QWidget(self)
         self._hidden.hide()
-        self._heading_rules = self._heading("RULES", 299, 50)
+        self._heading_rules = self._heading("RULES", 299, 53)
         self.rules_text = QLabel(self)
         self.rules_text.setTextFormat(Qt.RichText)
         self.rules_text.setWordWrap(True)
         self.rules_text.setAlignment(Qt.AlignTop | Qt.AlignLeft)
         self.rules_text.setStyleSheet("color: #c9ccd6; font-size: 12px;")
-        self.rules_text.setGeometry(299, 68, 225, 100)
+        self.rules_text.setGeometry(299, 77, 225, 133)
         self.rules_btn = QPushButton("Set Rules", self)
-        self.rules_btn.setGeometry(299, 175, 120, 26)
+        self.rules_btn.setGeometry(299, 198, 120, 26)
         self.rules_btn.clicked.connect(self.set_rules_requested)
         self.key = QComboBox(self)
         for k in KEYS:
             self.key.addItem(KEY_LABELS.get(k, k), k)     # shown as "W+A (up-left)", kept as "W+A"
         self.key.addItem("None", None)
-        self.key.setGeometry(299, 64, 126, 26)
-        self.will_loop = self._row_label("Will loop", 437, 64, 80)
+        self.key.setGeometry(299, 72, 126, 26)
+        self.will_loop = self._row_label("Will loop", 437, 72, 80)
         self.will_loop.setStyleSheet(GREY)
-        self.release_label = self._heading("ON RELEASE", 299, 99)
+        self.release_label = self._heading("ON RELEASE", 299, 119)
         self.release = RuleEditor(self)
         self.release.compact()
-        self.release.move(299, 114)
+        self.release.move(299, 139)
         for w in (self.key, self.will_loop, self.release_label, self.release):
             w.setParent(self._hidden)
         self.apply_btn = QPushButton("Apply", self)
-        self.apply_btn.setGeometry(447, 175, 80, 26)
+        self.apply_btn.setGeometry(447, 198, 80, 26)
         self.apply_btn.setDefault(True)
         self.apply_btn.setStyleSheet(APPLY_STYLE)
 
@@ -184,11 +185,17 @@ class SetFrameGroupPanel(Panel):
         self.blank = False
         self._load()
 
-    def new_group(self) -> None:
-        """Group > New Group: show an empty panel; the group is created when Apply is clicked."""
+    def new_group(self, first: int | None = None, last: int | None = None) -> None:
+        """Group > New Group: show an empty panel; the group is created when Apply is clicked. `first` and `last`
+        (0-based frame numbers) fill the Frames boxes in, for Create new Frame Group on a timeline selection."""
         self.current = None
         self.blank = False
+        self._new_range = None if first is None else (first, last if last is not None else first)
         self.refresh()
+        if self._new_range is None:
+            return
+        self._new_range = None                  # used once: after this the boxes follow the frame clicked, as before
+        self.name.setFocus(Qt.OtherFocusReason)
 
     def _load(self) -> None:
         p = self.controller.project
@@ -203,7 +210,8 @@ class SetFrameGroupPanel(Panel):
             self.current_group_changed.emit(None)
             return
         self.name.setText(g.name if g else "")
-        for b, v in ((self.from_box, (g.first if g else sel) + 1), (self.to_box, (g.last if g else sel) + 1)):
+        lo, hi = self._new_range or (sel, sel)                        # a timeline selection, else the frame clicked
+        for b, v in ((self.from_box, (g.first if g else lo) + 1), (self.to_box, (g.last if g else hi) + 1)):
             b.blockSignals(True)
             b.setValue(v)
             b.blockSignals(False)
