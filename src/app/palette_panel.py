@@ -95,9 +95,9 @@ class PaletteGrid(QWidget):
         self._press = self.drag_from = self.drop_at = None
         self.unsetCursor()
         self.update()
-        if dragged is None:
-            self.slot_clicked.emit(start)                # a plain click
-        elif target is not None and target != dragged:
+        if dragged is None or target == dragged:
+            self.slot_clicked.emit(start)                # a plain click, or a drag dropped back on its own slot
+        elif target is not None:
             self.slot_moved.emit(dragged, target)
 
     def paintEvent(self, event) -> None:

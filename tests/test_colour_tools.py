@@ -149,6 +149,20 @@ def test_a_plain_click_is_still_a_click_not_a_move(win):
     assert c.project.palette() == [BLACK, RED, GREEN, BLUE] and ed(win).cols["primary"] == GREEN
 
 
+def test_a_jittery_click_that_lands_back_on_its_own_slot_still_selects(win):
+    """A real click often moves the mouse a few pixels between press and release. If that jitter crosses the
+    drag threshold but the release still lands on the slot it started from, it must still count as a click, not
+    be swallowed as a cancelled drag (it used to select nothing until clicked a second time)."""
+    from src.app.palette_panel import DRAG_START
+    c = win.controller
+    c.edit.begin()
+    grid = pal(win).grid
+    centre = grid.slot_rect(2).center()
+    jittered = QPoint(centre.x() + DRAG_START + 1, centre.y())        # past the threshold, still inside slot 2
+    drag(grid, 2, jittered)
+    assert c.project.palette() == [BLACK, RED, GREEN, BLUE] and ed(win).cols["primary"] == GREEN
+
+
 def test_the_new_order_is_saved_with_the_project(win, tmp_path):
     from src.io.project_file import open_project, save_project
     p = win.controller.project
