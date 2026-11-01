@@ -138,7 +138,7 @@ def test_palette_panel_counts_and_free_slots(win):
 def test_frame_view_scale_and_transparent(win):
     v = win.panels["Frame view"].view
     img = v.grab().toImage()
-    assert img.pixelColor(128, 128).red() in (0, 73, 146)     # drawn, not blank
+    assert img.pixelColor(128, 128).red() in (73, 146, 192, 128)  # drawn, not blank (transparent shows as checkerboard)
 
 
 def test_long_frame_lists_drop_down_as_a_short_scrolling_list(win):
