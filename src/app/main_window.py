@@ -172,6 +172,7 @@ class MainWindow(QMainWindow):
         self.act_redo = a(self.menu_edit, "Redo", "Ctrl+Y")
         self.menu_edit.addSeparator()
         self.act_shrink = a(self.menu_edit, "Shrink Sprite")
+        self.act_resize = a(self.menu_edit, "Resize Canvas")
         self.act_reduce = a(self.menu_edit, "Reduce Palette")
         self.act_shorten = a(self.menu_edit, "Shorten Frame Names")
         self.act_new_group = a(self.menu_group, "New Group", "Ctrl+G")
@@ -186,6 +187,7 @@ class MainWindow(QMainWindow):
         self.act_undo.triggered.connect(lambda: self.controller.edit.undo() if self.controller.edit.mode else self.controller.undo())
         self.act_redo.triggered.connect(lambda: self.controller.edit.redo() if self.controller.edit.mode else self.controller.redo())
         self.act_shrink.triggered.connect(self.shrink_sprite)
+        self.act_resize.triggered.connect(self.resize_canvas)
         self.act_reduce.triggered.connect(self.reduce_palette)
         self.act_shorten.triggered.connect(self.shorten_names)
         self.act_new.triggered.connect(self.new_project)
@@ -493,6 +495,21 @@ class MainWindow(QMainWindow):
         p.dirty = True
         self._update_save_action()
 
+    def resize_canvas(self) -> None:
+        """Edit > Resize Canvas: choose the new size (with a Before / After preview); one Undo step."""
+        from src.app.resize_dialog import ResizeDialog
+        c = self.controller
+        p = c.project
+        if p is None or c.edit.mode or not p.frames:
+            return
+        dlg = ResizeDialog(self, p, c.selected, grounded=c.settings.resize_grounded,
+                           checker=not c.settings.solid_background)
+        if not dlg.exec():
+            return
+        width, height = dlg.chosen_size()
+        c.resize_canvas(width, height, dlg.grounded())
+        self._update_save_action()
+
     def reduce_palette(self) -> None:
         """Edit > Reduce Palette: choose the number of colours (with a From / To preview), ask again, then reduce every
         frame. It cannot be undone, so the Undo history is cleared; the project counts as unsaved."""
@@ -560,6 +577,7 @@ class MainWindow(QMainWindow):
         self.act_redo.setEnabled(e.can_redo if e.mode else self.controller.can_redo)
         p = self.controller.project
         self.act_shrink.setEnabled(p is not None and bool(p.frames) and not e.mode)    # not while editing
+        self.act_resize.setEnabled(p is not None and bool(p.frames) and not e.mode)
         self.act_shorten.setEnabled(p is not None and bool(p.frames) and not e.mode and bool(shared_prefix(p)))
         self.act_reduce.setEnabled(p is not None and bool(p.frames) and not e.mode and not p.system.is_fixed
                                    and can_reduce(p))

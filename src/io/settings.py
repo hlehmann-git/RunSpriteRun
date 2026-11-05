@@ -15,6 +15,7 @@ class Settings:
     grid: bool = True                          # pixel grid in the Frame view (default on)
     export_mode: str = "sheet"                 # what the Export Sprite Sheet dialog starts with
     solid_background: bool = False             # transparent colour shown solid, not as a checkerboard (Ctrl+B)
+    resize_grounded: bool = True               # Resize Canvas: Keep sprite grounded (last choice)
 
 
 def settings_path() -> Path:
@@ -36,6 +37,8 @@ def load(path: Path | None = None) -> Settings:
         return s
     if isinstance(data.get("grid"), bool):
         s.grid = data["grid"]
+    if isinstance(data.get("resize_grounded"), bool):
+        s.resize_grounded = data["resize_grounded"]
     if isinstance(data.get("solid_background"), bool):
         s.solid_background = data["solid_background"]
     if data.get("export_mode") in EXPORT_MODES:

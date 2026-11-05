@@ -5,7 +5,7 @@ from __future__ import annotations
 from PIL import Image
 from PySide6.QtCore import QObject, Signal
 
-from src.core import edit as edit_rules, editing, history, layers as L, palette, tools
+from src.core import edit as edit_rules, editing, history, layers as L, palette, rotsprite, tools
 from src.core.colour import Colour
 from src.core.project import Frame
 
@@ -25,6 +25,9 @@ MSG_FLOATING = "A paste is floating: press Enter to fix it in place or Esc to di
 MSG_NO_SELECTION = "Select an area first."
 MSG_NOTHING_COPIED = "Nothing has been copied yet."
 MSG_VIEW_ONLY = "Only the frame being edited can be changed. Go back to it first."
+MSG_NOTHING_TO_ROTATE = "There is nothing to rotate on the ticked layers."
+MSG_ROTATED = "Rotated {turn}. Drag or nudge it, Enter fixes, Esc cancels."     # short: it must fit the Edit head
+MSG_CUT_OFF = "Rotated {turn}: {n} pixels cut off. Enter fixes, Esc cancels."
 
 
 class EditSession(QObject):
@@ -609,11 +612,16 @@ class EditSession(QObject):
     def _render_floating(self) -> None:
         fl = self.floating
         p = self.controller.project
-        clip = {i: fl["clip"] for i in fl["targets"]}      # the same flattened picture onto every ticked layer
+        if fl.get("clips") is not None:                     # a rotation: each layer keeps its own pixels
+            clip = fl["clips"]
+        else:
+            clip = {i: fl["clip"] for i in fl["targets"]}  # a paste: the same flattened picture onto every ticked layer
         new = editing.paste_layers(fl["base"], clip, fl["x"], fl["y"], p.transparent)
         editing.set_frame_layers(p, self.idx, new)
         self.selection = self._cut_to_frame(self._float_rect())
         self.frame_edited.emit(self.idx)
+        if "rot" in fl:                                     # keep the cut-off count up to date while it is dragged
+            self.notice.emit(self.rotate_message())
 
     def fix(self) -> bool:
         """Enter: a floating paste is fixed in place as one Undo step; the selection is cleared."""
@@ -691,7 +699,7 @@ class EditSession(QObject):
     def can_rotate(self) -> bool:
         p = self.controller.project
         if self.floating is not None:
-            return self.floating["w"] == self.floating["h"]
+            return "rot" in self.floating or self.floating["w"] == self.floating["h"]
         if self._can_change():
             r = self.selection
             return r[2] - r[0] == r[3] - r[1]
@@ -720,6 +728,15 @@ class EditSession(QObject):
         img_fn = {"mirror": Image.FLIP_LEFT_RIGHT, "flip_h": Image.FLIP_LEFT_RIGHT, "flip": Image.FLIP_TOP_BOTTOM,
                   "flip_v": Image.FLIP_TOP_BOTTOM, "rotate_180": Image.ROTATE_180, "rotate_left": Image.ROTATE_90,
                   "rotate_right": Image.ROTATE_270}[name]
+        if self.floating is not None and "rot" in self.floating:   # a 45 degree rotation is still floating:
+            rot = self.floating["rot"]                             # turn it on from the original pixels
+            if name in ("rotate_right", "rotate_left", "rotate_180"):
+                self._add_turn({"rotate_right": 90, "rotate_left": -90, "rotate_180": 180}[name])
+            else:                                                  # the picture as shown is flipped exactly
+                key = "flip_h" if name in ("flip_h", "mirror") else "flip_v"
+                rot[key] = not rot[key]
+            self._turn_floating()
+            return True
         if self.floating is not None:                         # a floating paste is turned as it is
             fl = self.floating
             fl["clip"] = fl["clip"].transpose(img_fn)
@@ -737,3 +754,98 @@ class EditSession(QObject):
             self._edited()
             return True
         return False
+
+    # ---- rotate by 45 degrees (v2.0.20) ----------------------------------------------------------------
+    def rotate45(self, clockwise: bool) -> bool:
+        """The Action row's rotate buttons: turn the selection (or, with none, the whole frame) 45 degrees on the
+        ticked layers. The result floats like a paste: more clicks keep turning it, always from the original pixels
+        (two clicks = an exact 90 degrees); drag or nudge it, Enter fixes it as one Undo step, Esc (or Ctrl+Z) puts
+        everything back. Each layer is turned on its own, never flattened. Pixels pushed past the frame edge are cut
+        off when it is fixed, and a notice says how many."""
+        c = self.controller
+        p = c.project
+        if not self.mode or p is None or not p.frames:
+            return False
+        if c.selected != self.idx:
+            self.notice.emit(MSG_VIEW_ONLY)
+            return False
+        fl = self.floating
+        if fl is None:
+            targets = self.editable()
+            if not targets:
+                self.notice.emit(MSG_NO_LAYER)
+                return False
+            f = p.frames[self.idx]
+            base = L.layers_of(f, p.transparent)
+            rect = self.selection if self._can_change() else (0, 0, p.width, p.height)
+            src = {i: base[i].crop(rect) for i in targets}
+            src = {i: im for i, im in src.items() if not rotsprite.is_blank(im, p.transparent)}
+            if not src:
+                self.notice.emit(MSG_NOTHING_TO_ROTATE)
+                return False
+            self.floating = {"rot": self._rot_state(src, rect[0], rect[1], rect[2] - rect[0], rect[3] - rect[1]),
+                             "clips": None, "targets": list(src),
+                             "x": rect[0], "y": rect[1], "w": rect[2] - rect[0], "h": rect[3] - rect[1],
+                             "base": editing.clear_rect(base, list(src), rect, p.transparent),
+                             "image": f.image, "frame_layers": f.layers}
+            self.sel_idx = self.idx
+        elif "rot" not in fl:                                 # a floating paste: start turning it from as it is
+            fl["rot"] = self._rot_state({i: fl["clip"] for i in fl["targets"]}, fl["x"], fl["y"], fl["w"], fl["h"])
+        self._add_turn(45 if clockwise else -45)
+        self._turn_floating()
+        return True
+
+    def _add_turn(self, degrees: int) -> None:
+        """Turn the floating rotation further, clockwise as seen. Once it has been flipped, a clockwise turn of the
+        picture as shown is an anticlockwise turn of the original underneath the flip (two flips cancel out)."""
+        rot = self.floating["rot"]
+        rot["angle"] += -degrees if rot["flip_h"] != rot["flip_v"] else degrees
+
+    @staticmethod
+    def _rot_state(src: dict, x: int, y: int, w: int, h: int) -> dict:
+        """The original pixels, the total angle, and the centre (in half pixels) the turned picture is kept on.
+        px, py remember where it was last placed, so a drag moves the centre by exactly the dragged amount."""
+        return {"src": src, "angle": 0, "flip_h": False, "flip_v": False, "cx2": 2 * x + w, "cy2": 2 * y + h, "px": x, "py": y}
+
+    def _turn_floating(self) -> None:
+        """Turn the floating piece's original pixels to its total angle, keeping its centre where it is. The centre
+        is kept exactly (not worked out again from the last size), so turning back always lands on the same pixels."""
+        fl = self.floating
+        p = self.controller.project
+        rot = fl["rot"]
+        rot["cx2"] += 2 * (fl["x"] - rot["px"])               # any drag or nudge since the last turn
+        rot["cy2"] += 2 * (fl["y"] - rot["py"])
+        clips = {i: rotsprite.rotate(im, rot["angle"], p.transparent) for i, im in rot["src"].items()}
+        for key, how in (("flip_h", Image.FLIP_LEFT_RIGHT), ("flip_v", Image.FLIP_TOP_BOTTOM)):
+            if rot[key]:
+                clips = {i: im.transpose(how) for i, im in clips.items()}
+        nw, nh = next(iter(clips.values())).size
+        fl["x"] = rot["px"] = (rot["cx2"] - nw) // 2
+        fl["y"] = rot["py"] = (rot["cy2"] - nh) // 2
+        fl["w"], fl["h"], fl["clips"] = nw, nh, clips
+        self._render_floating()
+        self.changed.emit()
+
+    def rotate_message(self) -> str:
+        fl = self.floating
+        rot = fl["rot"]
+        a = rot["angle"] + (180 if rot["flip_h"] and rot["flip_v"] else 0)        # the turn as seen
+        a = rotsprite.normalise(-a if rot["flip_h"] != rot["flip_v"] else a)
+        turn = "back to the start" if a == 0 else f"{a}° right" if a <= 180 else f"{360 - a}° left"
+        n = self.cut_off_pixels()
+        return MSG_CUT_OFF.format(turn=turn, n=n) if n else MSG_ROTATED.format(turn=turn)
+
+    def cut_off_pixels(self) -> int:
+        """How many drawn pixels of the floating piece are outside the frame (they are lost when it is fixed)."""
+        fl = self.floating
+        p = self.controller.project
+        if fl is None:
+            return 0
+        clips = fl["clips"] if fl.get("clips") is not None else {0: fl["clip"]}
+        flat = L.flatten_subset(clips, (fl["w"], fl["h"]), p.transparent)
+        mask = L.opaque_mask(flat, p.transparent)
+        total = mask.histogram()[255]
+        x0, y0 = max(0, -fl["x"]), max(0, -fl["y"])
+        x1, y1 = min(fl["w"], p.width - fl["x"]), min(fl["h"], p.height - fl["y"])
+        inside = mask.crop((x0, y0, x1, y1)).histogram()[255] if x1 > x0 and y1 > y0 else 0
+        return total - inside

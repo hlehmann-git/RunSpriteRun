@@ -23,20 +23,23 @@ class Snapshot:
     extra_colours: tuple = ()
     control_rules: list = field(default_factory=list)
     transitions: list = field(default_factory=list)
+    size: tuple[int, int] | None = None     # the frame size (Resize Canvas changes it); None in older snapshots
 
     def same_as(self, other: "Snapshot") -> bool:
         return (len(self.frames) == len(other.frames)
                 and all(a[0] == b[0] and a[1] is b[1] and a[2] == b[2] and a[3] is b[3] for a, b in zip(self.frames, other.frames))
                 and self.groups == other.groups and self.start_state == other.start_state
                 and self.fps == other.fps and self.transparent == other.transparent and self.extra_colours == other.extra_colours
-                and self.control_rules == other.control_rules and self.transitions == other.transitions)
+                and self.control_rules == other.control_rules and self.transitions == other.transitions
+                and self.size == other.size)
 
 
 def take(project: Project) -> Snapshot:
     project.palette()                      # bring the saved palette up to date, so a snapshot holds the whole palette
     return Snapshot([(f.label, f.image, f.copied, f.layers, f.uid) for f in project.frames], copy.deepcopy(project.groups),
                     copy.deepcopy(project.start_state), project.fps, project.transparent,
-                    tuple(project.extra_colours), copy.deepcopy(project.control_rules), copy.deepcopy(project.transitions))
+                    tuple(project.extra_colours), copy.deepcopy(project.control_rules), copy.deepcopy(project.transitions),
+                    (project.width, project.height))
 
 
 def restore(project: Project, snap: Snapshot) -> None:
@@ -48,6 +51,8 @@ def restore(project: Project, snap: Snapshot) -> None:
     project.extra_colours = list(snap.extra_colours)
     project.control_rules = copy.deepcopy(snap.control_rules)
     project.transitions = copy.deepcopy(snap.transitions)
+    if snap.size is not None:
+        project.width, project.height = snap.size
     project.dirty = True
 
 

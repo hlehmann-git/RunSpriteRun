@@ -161,7 +161,7 @@ class FrameViewPanel(Panel):
         self.edit_note.setVisible(e.mode)
         if e.mode:
             if e.floating is not None:
-                self.edit_note.setText("PASTING")
+                self.edit_note.setText("ROTATING" if "rot" in e.floating else "PASTING")
                 self.edit_note.setStyleSheet("color: #4da3ff; font-weight: bold; font-size: 12px;")
             else:
                 self.edit_note.setText("EDITING" if editing else "VIEW ONLY")

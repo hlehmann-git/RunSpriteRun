@@ -348,7 +348,7 @@ Use the **Edit mode** toggle in the Edit panel (under the palette). A box offers
 
 In Edit mode the Frame view grows to a larger picture, and the Set Frame Group panel and RunSpriteRun window are hidden. The Frame Group Preview still plays. An orange border and an EDITING note show that you are editing, and other frames can be looked at but not drawn on.
 
-Your edits are made on a working copy. When you switch Edit mode off, a box offers **Apply changes**, **Discard changes** (this also drops a new frame) or **Keep editing**. While editing, Undo and Redo step through your edits only. New, Open, Save, Save As, Export and closing the program ask you to leave Edit mode first.
+Your edits are made on a working copy. When you switch Edit mode off, a box offers **Apply changes**, **Discard changes** (this also drops a new frame) or **Keep editing**. While editing, Undo and Redo (Ctrl+Z and Ctrl+Y, or the Edit menu) step through your edits only. New, Open, Save, Save As, Export and closing the program ask you to leave Edit mode first.
 
 ### Layers
 
@@ -384,12 +384,25 @@ Line, Square and Circle are pixel perfect at thickness 1, with no doubled corner
 
 Nine icons in the Action box, under the tools:
 
-1. **Mirror vertically** and 2. **Mirror horizontally** are toggles. Click one, then click in the Frame view to place a yellow guide line. Pencil, Eraser, Line, Square and Circle then draw mirrored across the line. Use both for four-way symmetry. Click the icon again to switch it off.
-2. **Rotate 90 degrees right**, 4. **Rotate 90 degrees left** and 5. **Rotate 180 degrees**. Rotating 90 degrees needs a square area.
-3. **Flip horizontally** and 7. **Flip vertically**.
-4. **Undo** and 9. **Redo**.
+- **Mirror vertically** and **Mirror horizontally** (icons 1 and 2) are toggles. Click one, then click in the Frame view to place a yellow guide line. Pencil, Eraser, Line, Square and Circle then draw mirrored across the line. Use both for four-way symmetry. Click the icon again to switch it off.
+- **Rotate 90 degrees right**, **Rotate 90 degrees left** and **Rotate 180 degrees** (icons 3 to 5). Rotating 90 degrees needs a square area.
+- **Flip horizontally** and **Flip vertically** (icons 6 and 7).
+- **Rotate 45 degrees left** and **Rotate 45 degrees right** (icons 8 and 9, the circular arrows: counter-clockwise and clockwise). See below.
 
 Rotate and flip act on the ticked layers, or on the selection or pasted piece if there is one.
+
+Undo and Redo are not on the Action row: use **Ctrl+Z** and **Ctrl+Y**, or the Edit menu.
+
+### Rotating by 45 degrees
+
+The two circular-arrow icons turn the selection, or the whole frame if nothing is selected, by 45 degrees on the ticked layers. Each layer is turned on its own, so your layers stay separate.
+
+- The result **floats**, like a paste. Click again to keep turning (45, 90, 135 degrees and so on). You can drag it or nudge it with the arrow keys.
+- Press **Enter** to fix it in place, or **Esc** to put everything back as it was. Ctrl+Z while it floats does the same as Esc. Once fixed, Ctrl+Z undoes the whole rotation in one step.
+- It always turns from your **original** pixels, never from the last result, so clicking back and forth does not wear the picture down. Two clicks give exactly the same picture as a 90 degree turn.
+- 45 degree turns use **RotSprite**, a method made for pixel art: it keeps edges clean instead of ragged. It only ever uses colours already in the picture, so no new colours are added to your palette.
+- A turned picture takes more room. If some of it would end up outside the frame, a message says how many pixels will be cut off; press Enter to accept, or move it back inside first. Unlike the 90 degree buttons, this works on any frame size.
+- While it floats, the 90 degree, 180 degree and flip buttons keep working on it too.
 
 ### Selecting, copying and pasting
 
@@ -399,11 +412,11 @@ With the Select tool, drag a rectangle (dotted outline). **Ctrl+A** selects all,
 
 The mouse wheel zooms around the pointer, and the - and + buttons by the frame arrows do the same, from fit up to 64x. Hold **Space** and drag, or drag with the middle mouse button, to pan. Once you're zoomed in past Fit, a reminder of this ("Hold Space and Left Click to pan") appears at the top right of the Frame view. The zoom stays when you step between frames.
 
-## 8. The Edit menu: Undo, Shrink Sprite and Reduce Palette
+## 8. The Edit menu: Undo, Shrink Sprite, Resize Canvas and Reduce Palette
 
-The **Edit** menu holds **Undo** (Ctrl+Z), **Redo** (Ctrl+Y) and two tools that change the whole project at once: **Shrink Sprite** and **Reduce Palette**. Both are switched off while Edit mode is on.
+The **Edit** menu holds **Undo** (Ctrl+Z), **Redo** (Ctrl+Y) and three tools that change the whole project at once: **Shrink Sprite**, **Resize Canvas** and **Reduce Palette**. All three are switched off while Edit mode is on.
 
-**Important:** neither tool can be undone, and both ask you to confirm twice. They change every frame in the project. If you want to keep your original, use **File > Save As** first, or simply do not save after trying them. The program warns: "This cannot be undone. Do not save the project if you want to protect the original assets."
+**Important:** Shrink Sprite and Reduce Palette cannot be undone, and both ask you to confirm twice. They change every frame in the project. If you want to keep your original, use **File > Save As** first, or simply do not save after trying them. The program warns: "This cannot be undone. Do not save the project if you want to protect the original assets."
 
 ### Shrink Sprite
 
@@ -414,6 +427,22 @@ Makes every frame smaller by a percentage, and keeps the colours inside the proj
 3. Confirm. Each frame is scaled down by averaging, then every pixel is snapped back to the nearest colour in the project's palette, so the colour limit still holds.
 
 A shrink that would take the frame below 4 pixels in either direction is refused. Shrinking clears the Undo history and marks the project as changed.
+
+### Resize Canvas
+
+Changes the canvas size of every frame, on every layer, without stretching the sprite: the pixels stay exactly as they are. Use it to give a sprite more room (for a longer sword or a bigger jump) or to trim empty space.
+
+1. Choose **Edit > Resize Canvas**.
+2. Type the new **Width** and **Height** (4 to 128 pixels). The line under them shows the change, for example 32 x 32 → 40 x 36 (+8 wide, +4 high).
+3. Choose where the sprite sits:
+    - **Keep sprite grounded** (ticked to start with): the bottom edge stays put, so the feet stay on the floor. Extra height is all added at the top, and a smaller height comes off the top. The width changes evenly on the left and right.
+    - Unticked: the sprite stays centred. When the change is an odd number of pixels, the spare pixel goes on the right or the bottom.
+4. Check the **Before** and **After** pictures, which use the same zoom so you can see the canvas grow or shrink. Use **Preview frame** to look at other frames.
+5. Click **OK**.
+
+New space is filled with the transparent colour. The canvas can never be made smaller than the sprites already drawn: the dialog shows the **smallest size that keeps every sprite whole**, and a size that would cut off pixels in any frame (on any layer) shows a red message, for example "This would cut off pixels in 6 of 17 frames. Choose a size of at least 30 x 32.", and OK stays greyed out. To trim something on purpose, erase it in Edit mode first.
+
+Resize Canvas **can be undone** with Ctrl+Z, as one step. The program remembers whether Keep sprite grounded was ticked.
 
 ### Reduce Palette
 
@@ -527,7 +556,7 @@ Saved and exported sheets use the same layout as a blank sheet, so a sheet can b
 
 | Item | Limit |
 |---|---|
-| Frame size | 4 x 4 to 128 x 128 pixels |
+| Frame size | 4 x 4 to 128 x 128 pixels (change it later with Edit > Resize Canvas) |
 | Frames per project | 120 |
 | Frame groups per project | 32 |
 | Project name | 1 to 40 characters (letters, numbers, - and _) |

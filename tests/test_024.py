@@ -63,5 +63,5 @@ def test_key_pad_is_in_the_timeline_and_the_keys_slot_is_empty(win):
     keys = win.panels["Keys"]
     assert tl.pad.parent() is tl and tl.pad.width() == 156 and tl.pad.height() == 184
     assert tl.pad.geometry().right() < tl.left.geometry().left()
-    assert (keys.width(), keys.height()) == (688, 208)      # 1.b: runs to the right edge of the window
+    assert (keys.width(), keys.height()) == (688, 264)      # 1.b: runs to the right edge; 264 tall since v2.0.18
     assert keys.title.isHidden() and not keys.findChildren(type(tl.pad))

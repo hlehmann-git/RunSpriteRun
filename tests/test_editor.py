@@ -535,17 +535,18 @@ def test_mirror_icon_toggles_off_and_clears_on_leaving(win):
     assert e.mirror == {"v": None, "h": None}
 
 
-def test_undo_redo_buttons(win):
+def test_undo_and_redo_are_on_ctrl_z_and_ctrl_y_not_on_the_action_row(win):
+    """v2.0.20: the Action row's Undo and Redo buttons became the 45 degree rotates; Undo and Redo stay on the keys."""
     c, e = win.controller, win.controller.edit
     from src.app.edit_panel import EditPanel
     panel = win.findChild(EditPanel)
-    assert not panel.actions["undo"].isEnabled() and not panel.actions["redo"].isEnabled()
+    assert "undo" not in panel.actions and "redo" not in panel.actions
+    assert win.act_undo.shortcut().toString() == "Ctrl+Z" and win.act_redo.shortcut().toString() == "Ctrl+Y"
     e.set_active((255, 0, 0))
     stroke(e, "pencil", (4, 4), (4, 4))
-    assert panel.actions["undo"].isEnabled() and not panel.actions["redo"].isEnabled()
-    panel.actions["undo"].click()
-    assert c.project.frames[0].image.getpixel((4, 4)) == T and panel.actions["redo"].isEnabled()
-    panel.actions["redo"].click()
+    win.act_undo.trigger()
+    assert c.project.frames[0].image.getpixel((4, 4)) == T
+    win.act_redo.trigger()
     assert c.project.frames[0].image.getpixel((4, 4)) == (255, 0, 0)
 
 
@@ -628,7 +629,7 @@ def test_rotate_and_flip_buttons_act_on_the_ticked_layers(win):
     from src.app.edit_panel import EditPanel
     c, e = win.controller, win.controller.edit
     panel = win.findChild(EditPanel)
-    assert list(panel.actions) == ["mirror_v", "mirror_h", "rotate_right", "rotate_left", "rotate_180", "flip_h", "flip_v", "undo", "redo"]
+    assert list(panel.actions) == ["mirror_v", "mirror_h", "rotate_right", "rotate_left", "rotate_180", "flip_h", "flip_v", "rotate_ccw45", "rotate_cw45"]
     red = (255, 0, 0)
     f = lambda: c.project.frames[0].image
     assert f().getpixel((1, 1)) == red
@@ -643,8 +644,8 @@ def test_rotate_and_flip_buttons_act_on_the_ticked_layers(win):
     panel.actions["rotate_left"].click()
     assert f().getpixel((1, 1)) == red
     for _ in range(5):
-        panel.actions["undo"].click()
-    assert f().getpixel((1, 1)) == red and not panel.actions["undo"].isEnabled()
+        assert e.undo()
+    assert f().getpixel((1, 1)) == red and not e.can_undo
 
 
 # ---- Select, Cut, Copy, Paste, Delete -----------------------------------------------------------------------

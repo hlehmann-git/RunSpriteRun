@@ -388,10 +388,16 @@ class Controller(QObject):
     def _step(self, move) -> bool:
         if self.project is None:
             return False
+        size = (self.project.width, self.project.height)
         snap = move(history.take(self.project))
         if snap is None:
             return False
         history.restore(self.project, snap)
+        if (self.project.width, self.project.height) != size:
+            self.selected = max(0, min(self.selected, len(self.project.frames) - 1))
+            self.history_changed.emit()
+            self._size_changed()
+            return True
         self.selected = max(0, min(self.selected, len(self.project.frames) - 1))
         self.history_changed.emit()
         self.frames_changed.emit()
@@ -415,6 +421,36 @@ class Controller(QObject):
         self.settings = new
         settings_io.save(new)
         self.settings_changed.emit()
+
+    def resize_canvas(self, width: int, height: int, grounded: bool) -> bool:
+        """Edit > Resize Canvas: every frame and layer to the new size, as one Undo step. Refused (with a message) if it
+        would cut off drawn pixels. The choice of Keep sprite grounded is remembered."""
+        from dataclasses import replace
+        from src.core import canvas
+        p = self.project
+        if p is None or self.edit.mode or not p.frames:
+            return False
+        if grounded != self.settings.resize_grounded:
+            self.settings = replace(self.settings, resize_grounded=grounded)
+            settings_io.save(self.settings)
+        if (width, height) == (p.width, p.height):
+            return False
+        before = self.checkpoint()
+        try:
+            canvas.resize_project(p, width, height, grounded)
+        except ValueError as e:
+            messages.warn(self.parent_widget, str(e))
+            return False
+        self.commit(before)
+        self._size_changed()
+        return True
+
+    def _size_changed(self) -> None:
+        """Every panel takes the new frame size; the history and the selection are kept."""
+        self.stop_run()
+        self.project_changed.emit()
+        self.frames_changed.emit()
+        self.selection_changed.emit(self.selected)
 
     def toggle_solid_background(self) -> None:
         """Toggle Solid background (Ctrl+B): the transparent colour shown solid, or as a checkerboard."""

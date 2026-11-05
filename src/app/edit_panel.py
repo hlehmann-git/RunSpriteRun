@@ -28,7 +28,8 @@ ACTION_TIPS = {"mirror_v": "Mirror vertically: click here, then click in the Fra
                "mirror_h": "Mirror horizontally: click here, then click in the Frame view to place the line. What you draw above appears below. Click again to switch off.",
                "rotate_right": "Rotate 90 degrees right", "rotate_left": "Rotate 90 degrees left", "rotate_180": "Rotate 180 degrees",
                "flip_h": "Flip horizontally (left to right)", "flip_v": "Flip vertically (top to bottom)",
-               "undo": "Undo (Ctrl+Z)", "redo": "Redo (Ctrl+Y)"}
+               "rotate_ccw45": "Rotate 45 degrees left (counter-clockwise). Click again to keep turning; Enter fixes it, Esc cancels.",
+               "rotate_cw45": "Rotate 45 degrees right (clockwise). Click again to keep turning; Enter fixes it, Esc cancels."}
 PNG_TOOLS = {"pencil", "eraser", "bucket", "select", "move", "square", "circle", "mirror_v", "mirror_h", "rot_right",
              "rot_left", "rot_180", "flip_h", "flip_v"}
 HEAD_STYLE = ("QWidget#head { background: #3780cd; border-top-left-radius: 7px; border-top-right-radius: 7px;"
@@ -209,10 +210,11 @@ class EditPanel(Panel):
             self.eyes.append(eye)
             self.targets.append(x)
         self.actions = {}
-        # (button name, how it is drawn): mirror modes first, then rotate and flip, then Undo and Redo
+        # (button name, how it is drawn): mirror modes first, then rotate and flip, then the 45 degree rotates (v2.0.20:
+        # they took the place, and the circular-arrow icons, of Undo and Redo, which stay on Ctrl+Z and Ctrl+Y)
         for i, (name, kind) in enumerate((("mirror_v", "mirror_v"), ("mirror_h", "mirror_h"), ("rotate_right", "rot_right"),
                                           ("rotate_left", "rot_left"), ("rotate_180", "rot_180"), ("flip_h", "flip_h"),
-                                          ("flip_v", "flip_v"), ("undo", "undo"), ("redo", "redo"))):
+                                          ("flip_v", "flip_v"), ("rotate_ccw45", "undo"), ("rotate_cw45", "redo"))):
             b = IconButton(kind, self.work)
             b.move(200 + (21 if i < 5 else 39) + (i % 5) * 36, 132 + (i // 5) * 38)
             b.setToolTip(ACTION_TIPS[name])
@@ -221,8 +223,8 @@ class EditPanel(Panel):
         self.actions["mirror_h"].clicked.connect(lambda: self.edit.toggle_mirror("h"))
         for n in ("rotate_right", "rotate_left", "rotate_180", "flip_h", "flip_v"):
             self.actions[n].clicked.connect(lambda _c=False, n=n: self.edit.action(n))
-        self.actions["undo"].clicked.connect(self.edit.undo)
-        self.actions["redo"].clicked.connect(self.edit.redo)
+        self.actions["rotate_ccw45"].clicked.connect(lambda: self.edit.rotate45(False))
+        self.actions["rotate_cw45"].clicked.connect(lambda: self.edit.rotate45(True))
         controller.selection_changed.connect(lambda _i: self._refresh())
         self.tool_buttons: dict[str, IconButton] = {}
         for i in range(len(TOOL_GRID)):
@@ -298,8 +300,8 @@ class EditPanel(Panel):
         for n, axis in (("mirror_v", "v"), ("mirror_h", "h")):
             self.actions[n].selected = e.mirror_armed == axis or e.mirror[axis] is not None
             self.actions[n].update()
-        self.actions["undo"].setEnabled(e.can_undo)
-        self.actions["redo"].setEnabled(e.can_redo)
+        for n in ("rotate_ccw45", "rotate_cw45"):
+            self.actions[n].setEnabled(e.mode and self.controller.selected == e.idx)
         if self._built_for != e.tool:
             self._build_options()
         self._refresh_select_buttons()
