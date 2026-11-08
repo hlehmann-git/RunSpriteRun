@@ -73,6 +73,12 @@ def fit_scale(w: int, h: int, view_w: int, view_h: int) -> int:
     return max(1, min(view_w // w, view_h // h))
 
 
+def fit_scale_fractional(w: int, h: int, view_w: int, view_h: int) -> float:
+    """Largest scale, whole or fractional, that fits the view. For small reference thumbnails only (never for a
+    pixel-editing view), so a canvas size that lands between two whole-number scales still fills its box."""
+    return min(view_w / w, view_h / h)
+
+
 def hide_transparent(img: Image.Image, transparent: Colour) -> Image.Image:
     """Paint pixels of the transparent colour black."""
     return Image.composite(Image.new("RGB", img.size, (0, 0, 0)), img, transparent_mask(img, transparent))
@@ -133,6 +139,21 @@ def render_sprite(img: Image.Image, transparent: Colour, view_w: int, view_h: in
                   checker: bool = False) -> Image.Image:
     """A full view image (black background, sprite centred) at physical pixel size."""
     big = scaled_sprite(img, transparent, view_w, view_h, grid, checker=checker)
+    out = Image.new("RGB", (view_w, view_h), (0, 0, 0))
+    out.paste(big, ((view_w - big.width) // 2, (view_h - big.height) // 2))
+    return out
+
+
+def render_sprite_smooth(img: Image.Image, transparent: Colour, view_w: int, view_h: int,
+                         checker: bool = False) -> Image.Image:
+    """A full view image at a fractional scale that always fills the box, with smooth (not nearest-neighbour)
+    resampling. For small reference thumbnails (section 5.1 exempts these: pixel accuracy does not matter at
+    this size, and a sprite whose height falls between two whole-number scales should not look tiny)."""
+    w, h = img.size
+    s = fit_scale_fractional(w, h, view_w, view_h)
+    big = img.resize((max(1, round(w * s)), max(1, round(h * s))), Image.LANCZOS)
+    if checker:
+        big = with_checker(big, img, transparent, s)
     out = Image.new("RGB", (view_w, view_h), (0, 0, 0))
     out.paste(big, ((view_w - big.width) // 2, (view_h - big.height) // 2))
     return out

@@ -58,8 +58,8 @@ class SetFrameGroupPanel(Panel):
         for ring, x in ((self.from_ring, 29), (self.to_ring, 165)):
             ring.setGeometry(x, 110, 102, 102)
         self._ring_colour(NO_COLOUR)
-        self.from_view = SpriteView(self, grid=False, size=96)
-        self.to_view = SpriteView(self, grid=False, size=96)
+        self.from_view = SpriteView(self, grid=False, size=96, smooth=True)
+        self.to_view = SpriteView(self, grid=False, size=96, smooth=True)
         self.from_box = QSpinBox(self)
         self.to_box = QSpinBox(self)
         for b in (self.from_box, self.to_box):

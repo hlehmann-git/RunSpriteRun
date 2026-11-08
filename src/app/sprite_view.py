@@ -8,7 +8,7 @@ from PySide6.QtWidgets import QWidget
 
 import math
 
-from src.app.render import fit_scale, render_sprite, render_sprite_at, render_window, to_qimage
+from src.app.render import fit_scale, render_sprite, render_sprite_at, render_sprite_smooth, render_window, to_qimage
 from src.core.colour import Colour
 
 VIEW_SIZE = 256
@@ -24,10 +24,11 @@ class SpriteView(QWidget):
     zoom_changed = Signal()
     placed = Signal(float, float)          # a mirror guide line is being placed: the clicked point, in sprite pixels
 
-    def __init__(self, parent: QWidget, grid: bool, size: int = VIEW_SIZE) -> None:
+    def __init__(self, parent: QWidget, grid: bool, size: int = VIEW_SIZE, smooth: bool = False) -> None:
         super().__init__(parent)
         self.setFixedSize(size, size)
         self.grid = grid
+        self.smooth = smooth          # small reference thumbnails only: fractional scale, always fills the box
         self.checker = False                  # the transparent colour shown as a checkerboard (see follow_checker)
         self._image: Image.Image | None = None
         self._transparent: Colour = (0, 0, 0)
@@ -246,6 +247,8 @@ class SpriteView(QWidget):
             if self.navigable:
                 _d, sc, left, top, _w, _h = self._geometry()
                 frame = render_window(self._image, self._transparent, pw, ph, sc, left, top, self.grid, self.checker)
+            elif self.zoom is None and self.smooth:
+                frame = render_sprite_smooth(self._image, self._transparent, pw, ph, self.checker)
             elif self.zoom is None:
                 frame = render_sprite(self._image, self._transparent, pw, ph, self.grid, self.checker)
             else:
